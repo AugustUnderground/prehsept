@@ -14,7 +14,7 @@ bug-reports:    https://github.com/augustunderground/prehsept/issues
 author:         Yannick Uhlmann
 maintainer:     augustunderground@protonmail.com
 copyright:      Yannick Uhlmann
-license:        GPL-3
+license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:

@@ -42,14 +42,3 @@ main = do
     batchSize = 4
     numIters = 2000
     numFeatures = 3
-
-
--- module Main where
--- 
--- import Lib
--- import Torch
--- 
--- main :: IO ()
--- main = print x where
---     t = asTensor ([0..5] :: [Float])
---     x = Torch.exp (-t)

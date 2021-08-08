@@ -10,7 +10,7 @@ the root of this repository according to `extra-include-dirs` and
 
 ## License
 
-GPL-3
+BSD3
 
 ## Thanks
 

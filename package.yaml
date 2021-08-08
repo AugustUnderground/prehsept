@@ -1,7 +1,7 @@
 name:                prehsept
 version:             0.1.0.0
 github:              "augustunderground/prehsept"
-license:             GPL-3
+license:             BSD3
 author:              "Yannick Uhlmann"
 maintainer:          "augustunderground@protonmail.com"
 copyright:           "Yannick Uhlmann"
