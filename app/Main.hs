@@ -3,9 +3,11 @@
 
 module Main where
 
+import Control.Monad.State
 import Control.Monad (when)
 
 import Torch
+import Torch.Internal.Managed.Type.Context (manual_seed_L)
 
 model :: Linear -> Tensor -> Tensor
 model state input = squeezeAll $ linear state input
@@ -42,3 +44,6 @@ main = do
     batchSize = 4
     numIters = 2000
     numFeatures = 3
+
+
+

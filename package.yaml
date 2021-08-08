@@ -19,6 +19,8 @@ description:         Please see the README on GitHub at <https://github.com/augu
 dependencies:
 - base >= 4.7 && < 5
 - hasktorch
+- libtorch-ffi
+- mtl
 
 library:
   source-dirs: src
