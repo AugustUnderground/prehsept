@@ -1,0 +1,65 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           prehsept
+version:        0.1.0.0
+synopsis:       PRECEPT, but in Haskell.
+description:    Please see the README on GitHub at <https://github.com/augustunderground/prehsept#readme>
+category:       ML, EDA
+homepage:       https://github.com/augustunderground/prehsept#readme
+bug-reports:    https://github.com/augustunderground/prehsept/issues
+author:         Yannick Uhlmann
+maintainer:     augustunderground@protonmail.com
+copyright:      Yannick Uhlmann
+license:        GPL-3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/augustunderground/prehsept
+
+library
+  exposed-modules:
+      Lib
+  other-modules:
+      Paths_prehsept
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , hasktorch
+  default-language: Haskell2010
+
+executable prehsept-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_prehsept
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , hasktorch
+    , prehsept
+  default-language: Haskell2010
+
+test-suite prehsept-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_prehsept
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , hasktorch
+    , prehsept
+  default-language: Haskell2010

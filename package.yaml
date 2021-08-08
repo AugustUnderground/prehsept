@@ -1,0 +1,46 @@
+name:                prehsept
+version:             0.1.0.0
+github:              "augustunderground/prehsept"
+license:             GPL-3
+author:              "Yannick Uhlmann"
+maintainer:          "augustunderground@protonmail.com"
+copyright:           "Yannick Uhlmann"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+synopsis:            "PRECEPT, but in Haskell."
+category:            "ML, EDA"
+
+description:         Please see the README on GitHub at <https://github.com/augustunderground/prehsept#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- hasktorch
+
+library:
+  source-dirs: src
+
+executables:
+  prehsept-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - prehsept
+
+tests:
+  prehsept-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - prehsept

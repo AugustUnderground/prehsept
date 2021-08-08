@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "prehsept:lib"
+
+    - path: "./app/Main.hs"
+      component: "prehsept:exe:prehsept-exe"
+
+    - path: "./app/Paths_prehsept.hs"
+      component: "prehsept:exe:prehsept-exe"
+
+    - path: "./test"
+      component: "prehsept:test:prehsept-test"
