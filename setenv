@@ -1,0 +1,4 @@
+#!/bin/sh
+
+export DEVICE="cuda:0"
+export LD_LIBRARY_PATH="$HOME/Workspace/libtorch/gpu":$LD_LIBRARY_PATH

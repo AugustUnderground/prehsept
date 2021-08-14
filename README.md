@@ -8,6 +8,13 @@ Requires [libtorch](https://pytorch.org/get-started/locally/) symlinked into
 the root of this repository according to `extra-include-dirs` and
 `extra-lib-dirs` in `stack.yaml`.
 
+The `setenv` script can be sourced to export the `DEVICE` variable, supposedly
+enabling GPU support in Hasktorch.
+
+```sh
+$ source setenv
+```
+
 ## License
 
 BSD3
