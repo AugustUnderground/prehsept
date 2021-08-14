@@ -38,10 +38,7 @@ main = do
             s = toDevice gpu state
             (y, y') = (groundTruth x, model s x)
 
-            -- y = toCUDA y
-            -- y' = toCUDA ym
-
-            loss = toCUDA $ mseLoss y y'
+            loss = mseLoss y y'
 
         when (i `mod` 100 == 0) $ do
             putStrLn $ "Iteration: " ++ show i ++ " | Loss: " ++ show loss
@@ -56,7 +53,8 @@ main = do
 
   where
     gpu         = Device CUDA 0
-    optimizer   = Adam { beta1 = 0.9
+    optimizer   = GD
+                {- Adam { beta1 = 0.9
                        , beta2 = 0.999
                        , m1    = [ zeros [1] (withDevice gpu defaultOpts)
                                  , zeros [1] (withDevice gpu defaultOpts)
@@ -65,8 +63,8 @@ main = do
                                  , zeros [1] (withDevice gpu defaultOpts)
                                  ]
                        , iter  = 0 
-                       }
+                       } -}
     defaultRNG  = mkGenerator gpu 666
     batchSize   = 4
-    numIters    = 5000
+    numIters    = 2000
     numFeatures = 3
