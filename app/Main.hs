@@ -1,70 +1,87 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Main where
 
-import Control.Monad.State
 import Control.Monad (when)
-
+import Data.List (foldl', intersperse)
+import GHC.Generics
 import Torch
 
-model :: Linear -> Tensor -> Tensor
-model state input = squeezeAll $ linear state input
+data NetSpec = NetSpec { numX :: Int
+                       , numY :: Int
+                       }
+    deriving (Show, Eq)
 
-groundTruth :: Tensor -> Tensor
-groundTruth t = squeezeAll $ matmul t weight + bias
-  where
-    weight = toCUDA $ asTensor ([42.0, 64.0, 96.0] :: [Float])
-    bias   = toCUDA $ full' [1] (3.14 :: Float)
+data Net = Net { l0 :: Linear
+               , l1 :: Linear
+               , l2 :: Linear
+               , l3 :: Linear
+               , l4 :: Linear
+               , l5 :: Linear
+               , l6 :: Linear
+               , l7 :: Linear
+               , l8 :: Linear
+               , l9 :: Linear
+               }
+    deriving (Generic, Show, Parameterized)
 
-printParams :: Linear -> IO ()
-printParams params = do
-    putStrLn $ "Parameters:\n\t" ++ show (toDependent $ weight params)
-    putStrLn $ "Bias:\n\t" ++ show (toDependent $ bias params)
+instance Randomizable NetSpec Net where
+    sample NetSpec {..} = Net <$> sample (LinearSpec numX   32)     -- Layer 0
+                              <*> sample (LinearSpec 32     128)    -- Layer 1
+                              <*> sample (LinearSpec 128    256)    -- Layer 2
+                              <*> sample (LinearSpec 256    512)    -- Layer 3
+                              <*> sample (LinearSpec 512    1024)   -- Layer 4
+                              <*> sample (LinearSpec 1024   512)    -- Layer 5
+                              <*> sample (LinearSpec 512    256)    -- Layer 6
+                              <*> sample (LinearSpec 256    128)    -- Layer 7
+                              <*> sample (LinearSpec 128    32)     -- Layer 8
+                              <*> sample (LinearSpec 32     numY)   -- Layer 9
+
+net :: Net -> Tensor -> Tensor
+net Net {..} x = linear l9 . relu
+               . linear l8 . relu
+               . linear l7 . relu
+               . linear l6 . relu
+               . linear l5 . relu
+               . linear l4 . relu
+               . linear l3 . relu
+               . linear l2 . relu
+               . linear l1 . relu
+               . linear l0 $ x
+
+genData :: Tensor -> Tensor
+genData t = (t - 5) ^ 2 + 3
 
 main :: IO ()
 main = do
-    randGen <- defaultRNG
-    init' <- sample $ LinearSpec { in_features = numFeatures, out_features = 1}
-    let init = toDevice gpu init'
-    printParams init
+    initModel' <- sample $ NetSpec numX numY
+    let initModel = toDevice gpu initModel'
+        optim     = mkAdam 0 0.9 0.999 (flattenParameters initModel)
 
-    (trained, _) <- foldLoop (init, randGen) numIters $ \(state, randGen) i -> do
-        let (input, randGen') = randn [batchSize, numFeatures] 
-                                      (withDevice gpu defaultOpts) 
-                                      randGen
+    trainedModel <- foldLoop initModel numIters $ \model iter -> do
 
-            x = toCUDA input
-            s = toDevice gpu state
-            (y, y') = (groundTruth x, model s x)
+        x <- randIO' [batchSize, numX] >>= return 
+                                         . (toDType Float) 
+                                         . (toDevice gpu) 
 
+        let y    = genData x
+            y'   = net model x
             loss = mseLoss y y'
 
-        when (i `mod` 100 == 0) $ do
-            putStrLn $ "Iteration: " ++ show i ++ " | Loss: " ++ show loss
+        when (mod iter 100 == 0) $ do
+            putStrLn $ "Iter: " ++ show iter ++ " | Loss: " ++ show loss
 
-        (newParam', _) <- runStep state optimizer loss 5e-3
-        let newParam = toDevice gpu newParam'
+        (model', _) <- runStep model optim loss 1e-3
+        return model'
 
-        pure (newParam, randGen')
-
-    printParams trained
-    pure ()
-
+    putStrLn "Done"
+    return ()
   where
-    gpu         = Device CUDA 0
-    optimizer   = GD
-                {- Adam { beta1 = 0.9
-                       , beta2 = 0.999
-                       , m1    = [ zeros [1] (withDevice gpu defaultOpts)
-                                 , zeros [1] (withDevice gpu defaultOpts)
-                                 ]
-                       , m2    = [ zeros [1] (withDevice gpu defaultOpts)
-                                 , zeros [1] (withDevice gpu defaultOpts)
-                                 ]
-                       , iter  = 0 
-                       } -}
-    defaultRNG  = mkGenerator gpu 666
-    batchSize   = 4
-    numIters    = 2000
-    numFeatures = 3
+    gpu       = Device CUDA 0
+    numX      = 4
+    numY      = 4
+    numIters  = 10000
+    batchSize = 2000
