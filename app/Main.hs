@@ -7,6 +7,7 @@ module Main where
 
 import Control.Monad (when)
 import Data.List (foldl', intersperse)
+import Data.Functor
 import GHC.Generics
 import Torch
 
@@ -41,16 +42,16 @@ instance Randomizable NetSpec Net where
                               <*> sample (LinearSpec 32     numY)   -- Layer 9
 
 net :: Net -> Tensor -> Tensor
-net Net {..} x = linear l9 . relu
-               . linear l8 . relu
-               . linear l7 . relu
-               . linear l6 . relu
-               . linear l5 . relu
-               . linear l4 . relu
-               . linear l3 . relu
-               . linear l2 . relu
-               . linear l1 . relu
-               . linear l0 $ x
+net Net {..} = linear l9 . relu
+             . linear l8 . relu
+             . linear l7 . relu
+             . linear l6 . relu
+             . linear l5 . relu
+             . linear l4 . relu
+             . linear l3 . relu
+             . linear l2 . relu
+             . linear l1 . relu
+             . linear l0
 
 genData :: Tensor -> Tensor
 genData t = (t - 5) ^ 2 + 3
@@ -62,10 +63,8 @@ main = do
         optim     = mkAdam 0 0.9 0.999 (flattenParameters initModel)
 
     trainedModel <- foldLoop initModel numIters $ \model iter -> do
-
-        x <- randIO' [batchSize, numX] >>= return 
-                                         . (toDType Float) 
-                                         . (toDevice gpu) 
+        x <- randIO' [batchSize, numX]
+             Data.Functor.<&> toDType Float . toDevice gpu
 
         let y    = genData x
             y'   = net model x
@@ -85,3 +84,5 @@ main = do
     numY      = 4
     numIters  = 10000
     batchSize = 2000
+    trainLoss = mseLoss 
+    validLoss = l1Loss 
