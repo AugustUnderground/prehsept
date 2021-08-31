@@ -1,61 +1,79 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE RecordWildCards #-}
-
 module Main where
 
-import Control.Monad (when)
-import Data.List (foldl', intersperse)
-import Data.Functor
-import GHC.Generics
-import Torch
+import Torch hiding (take) --, floor, repeat)
 
-data NetSpec = NetSpec { numX :: Int
-                       , numY :: Int
-                       }
-    deriving (Show, Eq)
+import System.Random
+import Data.Maybe
+import qualified Data.List as L
+import Data.List.Split
+import qualified Data.Map.Strict as M
+-- import qualified Data.Map as M
+import Control.Monad (when, forM)
+-- import qualified Data.Functor as F
 
-data Net = Net { l0 :: Linear
-               , l1 :: Linear
-               , l2 :: Linear
-               , l3 :: Linear
-               , l4 :: Linear
-               , l5 :: Linear
-               , l6 :: Linear
-               , l7 :: Linear
-               , l8 :: Linear
-               , l9 :: Linear
-               }
-    deriving (Generic, Show, Parameterized)
+import Lib
 
-instance Randomizable NetSpec Net where
-    sample NetSpec {..} = Net <$> sample (LinearSpec numX   32)     -- Layer 0
-                              <*> sample (LinearSpec 32     128)    -- Layer 1
-                              <*> sample (LinearSpec 128    256)    -- Layer 2
-                              <*> sample (LinearSpec 256    512)    -- Layer 3
-                              <*> sample (LinearSpec 512    1024)   -- Layer 4
-                              <*> sample (LinearSpec 1024   512)    -- Layer 5
-                              <*> sample (LinearSpec 512    256)    -- Layer 6
-                              <*> sample (LinearSpec 256    128)    -- Layer 7
-                              <*> sample (LinearSpec 128    32)     -- Layer 8
-                              <*> sample (LinearSpec 32     numY)   -- Layer 9
+main :: IO ()
+main = do
+    -- Loading Data from NetCDF
+    rawData         <- getDataFromNC ncFileName (paramsX ++ paramsY)
+    shuffledData    <- shuffleData rawData
 
-net :: Net -> Tensor -> Tensor
-net Net {..} = linear l9 . relu
-             . linear l8 . relu
-             . linear l7 . relu
-             . linear l6 . relu
-             . linear l5 . relu
-             . linear l4 . relu
-             . linear l3 . relu
-             . linear l2 . relu
-             . linear l1 . relu
-             . linear l0
+    -- Split shuffle and divide data
+    let (trainData, validData) = splitData shuffledData trainSplit
+        (trainX, trainY) = xyData trainData paramsX paramsY
+        (validX, validY) = xyData validData paramsX paramsY
 
-genData :: Tensor -> Tensor
-genData t = (t - 5) ^ 2 + 3
+    -- Normalize and Scale Data
 
+    -- Neural Network Setup
+    initModel' <- sample $ NetSpec numX numY
+    let initModel = toDevice gpu initModel'
+        optim     = mkAdam 0 0.9 0.999 (flattenParameters initModel)
+
+    -- Training
+    let numTrainSamples = head (shape trainX)
+        trainIdx        = chunksOf batchSize [0 .. numTrainSamples]
+        numIters        = numEpochs * length trainIdx
+
+    trainedModel <- foldLoop initModel numIters 
+                  $ \model iter -> do
+                      let i     = mod (iter - 1) numEpochs
+                          idx   = trainIdx !! i
+                          x     = toDevice gpu . toDType Float 
+                                . indexSelect' 0 idx $ trainX 
+                          y     = toDevice gpu . toDType Float 
+                                . indexSelect' 0 idx $ trainY
+                          y'    = net model x
+                          loss  = mseLoss y y'
+                      
+                      (model', _) <- runStep model optim loss learningRate
+
+                    -- Validation Step after Each Epoch
+                      when (i == 0) $ do
+                          putStrLn $ "Epoch: " ++ show (fromIntegral numEpochs / fromIntegral iter) ++ " | Loss: " ++ show loss
+                          -- putStrLn "Validation Step"
+
+                      return model'
+
+    putStrLn $ "Train X shape: " ++ show (shape trainX)
+    -- putStrLn $ "Y shape: " ++ show (shape dataY)
+    return ()
+
+    where 
+        ncFileName      = "/home/ynk/workspace/data/xh035-nmos.nc"
+        paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
+        paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
+        trainSplit      = 0.8
+        numX            = 4
+        numY            = 4
+        numEpochs       = 42
+        batchSize       = 2000
+        learningRate    = 1.0e-3
+        gpu             = Device CUDA 0
+        getIdx          = take batchSize . concat . Prelude.repeat
+
+{-
 main :: IO ()
 main = do
     initModel' <- sample $ NetSpec numX numY
@@ -64,7 +82,7 @@ main = do
 
     trainedModel <- foldLoop initModel numIters $ \model iter -> do
         x <- randIO' [batchSize, numX]
-             Data.Functor.<&> toDType Float . toDevice gpu
+             F.<&> toDType Float . toDevice gpu
 
         let y    = genData x
             y'   = net model x
@@ -86,3 +104,4 @@ main = do
     batchSize = 2000
     trainLoss = mseLoss 
     validLoss = l1Loss 
+-}

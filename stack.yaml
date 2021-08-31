@@ -10,6 +10,10 @@ extra-deps:
       - hasktorch
       - libtorch-ffi
       - libtorch-ffi-helper
+  - hnetcdf-0.5.0.0@sha256:32bcbfd5f30b16834f98b4a71a8fa0e9440b307506999b441b3aadb8c1f8c7d1,4036
+  - repa-3.4.1.4@sha256:5a99bde69fe96a18d70aae23f47c8f719b1134558dca3ee5a7c15423b68a132e,3323
+  - Frames-0.7.2@sha256:dc30b1eee32e9ef6a5df31ddd951aba526de56c05bb9c495d0ce39e1f24d37c6,8898
+  - discrimination-0.4.1@sha256:2870c50b9582610a7f20b8b9a7f3b8dc5d37e5ba0082dee22107c6aeb2405a6a,3482
 
 extra-include-dirs:
   - libtorch/include/torch/csrc/api/include

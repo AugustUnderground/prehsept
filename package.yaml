@@ -21,6 +21,14 @@ dependencies:
 - hasktorch
 - libtorch-ffi
 - mtl
+- containers
+- vector
+- hnetcdf
+  #- pipes
+- split
+- random
+- random-shuffle
+- MonadRandom
 
 library:
   source-dirs: src
