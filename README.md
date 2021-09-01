@@ -9,7 +9,7 @@ the root of this repository according to `extra-include-dirs` and
 `extra-lib-dirs` in `stack.yaml`.
 
 The `setenv` script can be sourced to export the correct `LD_LIBRARY_PATH`.
-Additionally it export the `DEVICE` variable, supposedly enabling GPU support
+Additionally it exports the `DEVICE` variable, supposedly enabling GPU support
 in Hasktorch (I'm not sure how/if it works).
 
 ```sh
@@ -29,6 +29,12 @@ and run
 ```sh
 $ stack run
 ```
+
+## TODO
+
+- [ ] Add Tests
+- [ ] Try data loaders
+- [ ] Move training loop to Lib
 
 ## License
 
