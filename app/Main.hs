@@ -1,15 +1,13 @@
 module Main where
 
-import Torch hiding (take) --, floor, repeat)
+import Torch hiding (take, floor) 
 
 import System.Random
 import Data.Maybe
 import qualified Data.List as L
 import Data.List.Split
-import qualified Data.Map.Strict as M
--- import qualified Data.Map as M
+-- import qualified Data.Map.Strict as M
 import Control.Monad (when, forM)
--- import qualified Data.Functor as F
 
 import Lib
 
@@ -19,16 +17,12 @@ main = do
     rawData         <- getDataFromNC ncFileName (paramsX ++ paramsY)
     shuffledData    <- shuffleData rawData
 
-    -- Split shuffle and divide data
-    let (trainData, validData) = splitData shuffledData trainSplit
-        (trainX, trainY) = xyData trainData paramsX paramsY
-        (validX, validY) = xyData validData paramsX paramsY
-
-    -- Normalize and Scale Data
+    let (trainX, trainY, validX, validY, scalerX, scalerY) 
+            = preprocessData lower upper maskX maskY paramsX paramsY trainSplit shuffledData
 
     -- Neural Network Setup
     initModel' <- sample $ NetSpec numX numY
-    let initModel = toDevice gpu initModel'
+    let initModel = toDevice dev initModel'
         optim     = mkAdam 0 0.9 0.999 (flattenParameters initModel)
 
     -- Training
@@ -40,9 +34,9 @@ main = do
                   $ \model iter -> do
                       let i     = mod (iter - 1) numEpochs
                           idx   = trainIdx !! i
-                          x     = toDevice gpu . toDType Float 
+                          x     = toDevice dev . toDType Float 
                                 . indexSelect' 0 idx $ trainX 
-                          y     = toDevice gpu . toDType Float 
+                          y     = toDevice dev . toDType Float 
                                 . indexSelect' 0 idx $ trainY
                           y'    = net model x
                           loss  = mseLoss y y'
@@ -51,57 +45,35 @@ main = do
 
                     -- Validation Step after Each Epoch
                       when (i == 0) $ do
-                          putStrLn $ "Epoch: " ++ show (fromIntegral numEpochs / fromIntegral iter) ++ " | Loss: " ++ show loss
-                          -- putStrLn "Validation Step"
+                          let vx     = toDevice dev . toDType Float $ validX 
+                              vy     = toDevice dev . toDType Float $ validY
+                              vy'    = net model vx
+                              vLoss  = l1Loss ReduceMean vy vy'
+                              epoch  = floor $ fromIntegral (iter - 1) 
+                                             / fromIntegral numEpochs
+                          putStrLn $ "Epoch: " ++ show epoch  
+                                  ++ " | Training Loss (MSE): " ++ show (asValue loss :: Float) 
+                                  ++ " Validation Loss (MAE): " ++ show (asValue vLoss :: Float)
 
                       return model'
 
-    putStrLn $ "Train X shape: " ++ show (shape trainX)
-    -- putStrLn $ "Y shape: " ++ show (shape dataY)
+    putStrLn "Done!"
     return ()
 
     where 
         ncFileName      = "/home/ynk/workspace/data/xh035-nmos.nc"
         paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
         paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
+        maskX           = [0,1,0,0]
+        maskY           = [1,0,1,0]
+        numX            = length paramsX
+        numY            = length paramsY
         trainSplit      = 0.8
-        numX            = 4
-        numY            = 4
+        lower           = 0
+        upper           = 1
         numEpochs       = 42
         batchSize       = 2000
         learningRate    = 1.0e-3
-        gpu             = Device CUDA 0
+        -- dev             = Device CUDA 0
+        dev             = Device CPU 0
         getIdx          = take batchSize . concat . Prelude.repeat
-
-{-
-main :: IO ()
-main = do
-    initModel' <- sample $ NetSpec numX numY
-    let initModel = toDevice gpu initModel'
-        optim     = mkAdam 0 0.9 0.999 (flattenParameters initModel)
-
-    trainedModel <- foldLoop initModel numIters $ \model iter -> do
-        x <- randIO' [batchSize, numX]
-             F.<&> toDType Float . toDevice gpu
-
-        let y    = genData x
-            y'   = net model x
-            loss = mseLoss y y'
-
-        when (mod iter 100 == 0) $ do
-            putStrLn $ "Iter: " ++ show iter ++ " | Loss: " ++ show loss
-
-        (model', _) <- runStep model optim loss 1e-3
-        return model'
-
-    putStrLn "Done"
-    return ()
-  where
-    gpu       = Device CUDA 0
-    numX      = 4
-    numY      = 4
-    numIters  = 10000
-    batchSize = 2000
-    trainLoss = mseLoss 
-    validLoss = l1Loss 
--}

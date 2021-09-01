@@ -7,11 +7,15 @@
 module Lib ( NetSpec (..)
            , Net
            , net
-           , genData
            , getDataFromNC
            , shuffleData
            , splitData
            , xyData
+           , transformData
+           , scaleData
+           , transformData'
+           , scaleData'
+           , preprocessData
            ) where
 
 import Torch hiding (take, floor)
@@ -75,9 +79,6 @@ net Net {..} = linear l9 . relu
 -- DATA
 ------------------------------------------------------------------------------
 
-genData :: Tensor -> Tensor
-genData t = (t - 5) ^ 2 + 3
-
 type SVRet a = IO (Either NcError (SV.Vector a))
 
 getDataFromNC :: String -> [String] -> IO (M.Map String [Float])
@@ -110,3 +111,77 @@ xyData m x y = ( toTensor (mapMaybe (`M.lookup` m) x :: [[Float]])
                , toTensor (mapMaybe (`M.lookup` m) y :: [[Float]]) )
     where toTensor = transpose (Dim 0) (Dim 1) . asTensor 
 
+-- | Applys `ln|x|` to each feature x of the given tensor. Where `x` can be
+-- | masked with an [Int].
+transformData :: [Int] -> Tensor -> Tensor
+transformData m t = (+ t') . (* m') 
+                  . Torch.transpose (Dim 0) (Dim 1) 
+                  . Torch.log
+                  . (+ asTensor (1 :: Float))
+                  . Torch.abs 
+                  . Torch.transpose (Dim 0) (Dim 1) 
+                  $ t
+    where m' = asTensor (m :: [Int])
+          t' = t * (1 - m')
+
+-- | Applys `e^x` to each column x of the given tensor. Where `x` can be masked
+-- | with [Int].
+transformData' :: [Int] -> Tensor -> Tensor
+transformData' m t = (+ t') . (* m') 
+                  . Torch.transpose (Dim 0) (Dim 1) 
+                  . Torch.exp
+                  . Torch.transpose (Dim 0) (Dim 1) 
+                  $ t
+    where m' = asTensor (m :: [Int])
+          t' = t * (1 - m')
+
+-- | Scale data such that x ∈ [a;b]. Returns a tuple, with the scaled Tensor
+-- | and a Tensor [2,num-features] with min and max values per feature for
+-- | unscaling.
+scaleData :: Float -> Float -> Tensor -> (Tensor, Tensor)
+scaleData a b x = ( ((x - xMin) * (b' - a')) / (xMax - xMin)
+                  , Torch.cat (Dim 0) [ Torch.reshape [1,-1] xMin
+                                      , Torch.reshape [1,-1] xMax ])
+    where (xMin, _) = Torch.minDim (Dim 0) RemoveDim x
+          (xMax, _) = Torch.maxDim (Dim 0) RemoveDim x
+          a' = asTensor (a :: Float)
+          b' = asTensor (b :: Float)
+          
+-- | Un-Scale data where x ∈ [a;b] for a given min and max.
+scaleData' :: Float -> Float -> Tensor -> Tensor -> Tensor
+scaleData' a b s y = ((y - a') / (b' - a') * (xMax - xMin)) + xMin
+    where xMin = Torch.select 0 0 s
+          xMax = Torch.select 0 1 s
+          a' = asTensor (a :: Float)
+          b' = asTensor (b :: Float)
+
+-- | 'preprocessData' is a convenience function to clean up main.
+-- | Arguments:
+-- |    lower limit scaled :: FLoat
+-- |    upper limit scaled :: FLoat
+-- |    transformation mask X :: [Int]
+-- |    transformation mask Y :: [Int]
+-- |    parameters X :: [String]
+-- |    parameters Y :: [String]
+-- |    train test split ratio :: Float
+-- |    NetCDF Data map as obtained by `getDataFromNC`
+-- | Returns a tuple of tensors, split into X and Y parametrs and split into
+-- |    train and validation sets. Additionaly scalers are returned for unscaling
+-- |    the data later.
+-- |    -> (trainX, trainY, validX, validY, scalerX, scalerY)
+preprocessData :: Float -> Float -> [Int] -> [Int] -> [String] -> [String] 
+               -> Float -> M.Map String [Float] 
+               -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)
+preprocessData lo hi mX mY pX pY s d = ( trainX, trainY, validX, validY
+                                       , scalerX, scalerY)
+    where (rawTrain, rawValid)       = splitData d s
+          (rawTrainX, rawTrainY)     = xyData rawTrain pX pY
+          (rawValidX, rawValidY)     = xyData rawValid pX pY
+          trafoTrainX                = transformData mX rawTrainX
+          trafoTrainY                = transformData mY rawTrainY
+          trafoValidX                = transformData mX rawValidX
+          trafoValidY                = transformData mY rawValidY
+          (trainX, scalerX)          = scaleData lo hi trafoTrainX
+          (trainY, scalerY)          = scaleData lo hi trafoTrainY
+          (validX, _)                = scaleData lo hi trafoValidX
+          (validY, _)                = scaleData lo hi trafoValidY
