@@ -61,7 +61,7 @@ main = do
     return ()
 
     where 
-        ncFileName      = "/home/ynk/workspace/data/xh035-nmos.nc"
+        ncFileName      = "/home/uhlmanny/Workspace/data/xh035-nmos.nc"
         paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
         paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
         maskX           = [0,1,0,0]
