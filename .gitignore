@@ -31,3 +31,6 @@ tags
 .hspec-failures
 better-cache/
 stack*.yaml.lock
+
+*.svg
+*.png
