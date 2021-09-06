@@ -32,9 +32,10 @@ $ stack run
 
 ## TODO
 
-- [ ] Add Tests
-- [ ] Try data loaders
-- [ ] Move training loop to Lib
+- [ ] Add argument parser for training data path etc.
+- [ ] Add Tests.
+- [X] Try data loaders. (Not working as expected)
+- [ ] Move training loop to Lib.
 
 ## License
 
