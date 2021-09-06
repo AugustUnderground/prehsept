@@ -40,9 +40,11 @@ library
     , hnetcdf
     , libtorch-ffi
     , mtl
+    , pipes
     , random
     , random-shuffle
     , split
+    , text
     , vector
   default-language: Haskell2010
 
@@ -61,10 +63,12 @@ executable prehsept-exe
     , hnetcdf
     , libtorch-ffi
     , mtl
+    , pipes
     , prehsept
     , random
     , random-shuffle
     , split
+    , text
     , vector
   default-language: Haskell2010
 
@@ -84,9 +88,11 @@ test-suite prehsept-test
     , hnetcdf
     , libtorch-ffi
     , mtl
+    , pipes
     , prehsept
     , random
     , random-shuffle
     , split
+    , text
     , vector
   default-language: Haskell2010

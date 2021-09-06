@@ -24,7 +24,8 @@ dependencies:
 - containers
 - vector
 - hnetcdf
-  #- pipes
+- pipes
+- text
 - split
 - random
 - random-shuffle
