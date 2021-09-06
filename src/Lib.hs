@@ -1,12 +1,19 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Lib ( NetSpec (..)
            , Net
            , net
+           , OP (..)
+           , OPData (..)
            , getDataFromNC
            , shuffleData
            , splitData
@@ -19,17 +26,29 @@ module Lib ( NetSpec (..)
            ) where
 
 import Torch hiding (take, floor)
+
 import Data.NetCDF
 import Data.NetCDF.Vector
 import Foreign.C
+
 import Data.Maybe (mapMaybe)
+
 import GHC.Generics
-import System.Random.Shuffle
-import Control.Monad.Random
+import GHC.Exts (IsList (fromList))
+
+import System.Random.Shuffle hiding (shuffle)
+
+-- import Control.Lens (element, (^?))
 -- import Control.Monad.Cont (ContT (..), runContT)
+import Control.Monad.Random hiding (fromList, split)
+
+import Data.Kind
+-- import Data.List.Split
+import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.List as L
 import qualified Data.Vector.Storable as SV
+
 
 ------------------------------------------------------------------------------
 -- NEURAL NETWORK
@@ -78,6 +97,16 @@ net Net {..} = linear l9 . relu
 ------------------------------------------------------------------------------
 -- DATA
 ------------------------------------------------------------------------------
+
+data OP = OP {dev :: Device, numBatches :: Int, opData :: OPData}
+    -- deriving (Eq, Ord, Show)
+
+instance Dataset IO OP Int (Tensor, Tensor)
+    where getItem OP {..} ix = pure ( toDevice dev . toDType Float . (!! ix) . inputs $ opData
+                                    , toDevice dev . toDType Float . (!! ix) . outputs $ opData )
+          keys OP {..} = S.fromList [ 0 .. (numBatches - 1) ]
+
+data OPData = OPData { inputs :: [Tensor], outputs :: [Tensor] }
 
 type SVRet a = IO (Either NcError (SV.Vector a))
 
@@ -157,6 +186,7 @@ scaleData' a b s y = ((y - a') / (b' - a') * (xMax - xMin)) + xMin
 
 -- | 'preprocessData' is a convenience function to clean up main.
 -- | Arguments:
+-- |    computing device :: Device
 -- |    lower limit scaled :: FLoat
 -- |    upper limit scaled :: FLoat
 -- |    transformation mask X :: [Int]
@@ -165,16 +195,17 @@ scaleData' a b s y = ((y - a') / (b' - a') * (xMax - xMin)) + xMin
 -- |    parameters Y :: [String]
 -- |    train test split ratio :: Float
 -- |    NetCDF Data map as obtained by `getDataFromNC`
--- | Returns a tuple of tensors, split into X and Y parametrs and split into
--- |    train and validation sets. Additionaly scalers are returned for unscaling
--- |    the data later.
--- |    -> (trainX, trainY, validX, validY, scalerX, scalerY)
+-- |    batch size :: Int
+-- |    target computing device :: Device
+-- | Returns a tuple  split into train and validation sets. Additionaly scalers
+-- | are returned for unscaling the data later.
+-- |    -> (trainingData, validationData, scalerX, scalerY)
 preprocessData :: Float -> Float -> [Int] -> [Int] -> [String] -> [String] 
-               -> Float -> M.Map String [Float] 
-               -> (Tensor, Tensor, Tensor, Tensor, Tensor, Tensor)
-preprocessData lo hi mX mY pX pY s d = ( trainX, trainY, validX, validY
-                                       , scalerX, scalerY)
-    where (rawTrain, rawValid)       = splitData d s
+                -> Float -> M.Map String [Float] -> Int -> Device
+                -> (OPData, OPData, Tensor, Tensor)
+preprocessData lo hi mX mY pX pY splt dat bs dev 
+        = ( trainData, validData, scalerX, scalerY)
+    where (rawTrain, rawValid)       = splitData dat splt
           (rawTrainX, rawTrainY)     = xyData rawTrain pX pY
           (rawValidX, rawValidY)     = xyData rawValid pX pY
           trafoTrainX                = transformData mX rawTrainX
@@ -185,3 +216,15 @@ preprocessData lo hi mX mY pX pY s d = ( trainX, trainY, validX, validY
           (trainY, scalerY)          = scaleData lo hi trafoTrainY
           (validX, _)                = scaleData lo hi trafoValidX
           (validY, _)                = scaleData lo hi trafoValidY
+          trainData                  = OPData (split bs (Dim 0) . toDevice dev 
+                                                                . toDType Float 
+                                                                $ trainX) 
+                                              (split bs (Dim 0) . toDevice dev 
+                                                                . toDType Float 
+                                                                $ trainY)
+          validData                  = OPData (split bs (Dim 0) . toDevice dev 
+                                                                . toDType Float 
+                                                                $ validX) 
+                                              (split bs (Dim 0) . toDevice dev 
+                                                                . toDType Float 
+                                                                $ validY)
