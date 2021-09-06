@@ -37,6 +37,7 @@ $ stack run
 - [X] Try data loaders. 
 - [X] Move training loop to Lib.
 - [X] Plots
+- [ ] Serving
 
 ## License
 

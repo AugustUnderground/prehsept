@@ -34,3 +34,6 @@ stack*.yaml.lock
 
 *.svg
 *.png
+
+*.pt
+*.ckpt
