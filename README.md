@@ -34,8 +34,9 @@ $ stack run
 
 - [ ] Add argument parser for training data path etc.
 - [ ] Add Tests.
-- [X] Try data loaders. (Not working as expected)
-- [ ] Move training loop to Lib.
+- [X] Try data loaders. 
+- [X] Move training loop to Lib.
+- [X] Plots
 
 ## License
 
