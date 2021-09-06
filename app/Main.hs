@@ -50,6 +50,8 @@ main = do
 
                         return (m', l':l)
 
+    saveParams model modelFileName
+
     plotList [ Key Nothing
              , terminal (SVG.cons "./plot.svg")
              ] $ zip [1 .. length loss] loss
@@ -59,6 +61,7 @@ main = do
     where 
 
         ncFileName      = "/home/uhlmanny/Workspace/data/xh035-nmos.nc"
+        modelFileName   = "./model.pt"
         paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
         paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
         maskX           = [0,1,0,0]
@@ -68,7 +71,7 @@ main = do
         trainSplit      = 0.8
         lower           = 0
         upper           = 1
-        numEpochs       = 42
+        numEpochs       = 666 -- 42
         batchSize       = 2000
         numWorkers      = 25
         dev             = Device CUDA 1
