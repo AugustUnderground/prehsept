@@ -14,8 +14,11 @@ module Lib ( NetSpec (..)
            , net
            , OP (..)
            , OPData (..)
+           , trainLoop
+           , validLoop
            , getDataFromNC
            , shuffleData
+
            , splitData
            , xyData
            , transformData
@@ -30,33 +33,40 @@ import Torch hiding (take, floor)
 import Data.NetCDF
 import Data.NetCDF.Vector
 import Foreign.C
-
 import Data.Maybe (mapMaybe)
-
-import GHC.Generics
-import GHC.Exts (IsList (fromList))
-
-import System.Random.Shuffle hiding (shuffle)
-
--- import Control.Lens (element, (^?))
--- import Control.Monad.Cont (ContT (..), runContT)
-import Control.Monad.Random hiding (fromList, split)
-
-import Data.Kind
--- import Data.List.Split
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Data.List as L
 import qualified Data.Vector.Storable as SV
-
+import GHC.Generics
+import GHC.Exts (IsList (fromList))
+import Pipes
+import qualified Pipes.Prelude as P
+import System.Random.Shuffle hiding (shuffle)
+import Control.Monad.Random hiding (fromList, split)
 
 ------------------------------------------------------------------------------
 -- NEURAL NETWORK
 ------------------------------------------------------------------------------
 
+-- | Neural Network Architecture Specification Type
 data NetSpec = NetSpec { numX :: Int , numY :: Int }
     deriving (Show, Eq)
 
+-- | Neural Network Architecture Specification
+instance Randomizable NetSpec Net where
+    sample NetSpec {..} = Net <$> sample (LinearSpec numX   32)     -- Layer 0
+                              <*> sample (LinearSpec 32     128)    -- Layer 1
+                              <*> sample (LinearSpec 128    256)    -- Layer 2
+                              <*> sample (LinearSpec 256    512)    -- Layer 3
+                              <*> sample (LinearSpec 512    1024)   -- Layer 4
+                              <*> sample (LinearSpec 1024   512)    -- Layer 5
+                              <*> sample (LinearSpec 512    256)    -- Layer 6
+                              <*> sample (LinearSpec 256    128)    -- Layer 7
+                              <*> sample (LinearSpec 128    32)     -- Layer 8
+                              <*> sample (LinearSpec 32     numY)   -- Layer 9
+
+-- | Neural Network Architecture Definition Type
 data Net = Net { l0 :: Linear
                , l1 :: Linear
                , l2 :: Linear
@@ -70,18 +80,7 @@ data Net = Net { l0 :: Linear
                }
     deriving (Generic, Show, Parameterized)
 
-instance Randomizable NetSpec Net where
-    sample NetSpec {..} = Net <$> sample (LinearSpec numX   32)     -- Layer 0
-                              <*> sample (LinearSpec 32     128)    -- Layer 1
-                              <*> sample (LinearSpec 128    256)    -- Layer 2
-                              <*> sample (LinearSpec 256    512)    -- Layer 3
-                              <*> sample (LinearSpec 512    1024)   -- Layer 4
-                              <*> sample (LinearSpec 1024   512)    -- Layer 5
-                              <*> sample (LinearSpec 512    256)    -- Layer 6
-                              <*> sample (LinearSpec 256    128)    -- Layer 7
-                              <*> sample (LinearSpec 128    32)     -- Layer 8
-                              <*> sample (LinearSpec 32     numY)   -- Layer 9
-
+-- | Neural Network Architecture Definition
 net :: Net -> Tensor -> Tensor
 net Net {..} = linear l9 . relu
              . linear l8 . relu
@@ -94,16 +93,45 @@ net Net {..} = linear l9 . relu
              . linear l1 . relu
              . linear l0
 
+-- | Training Loop
+trainLoop :: Optimizer o => Net -> o -> Float -> ListT IO (Tensor, Tensor) 
+          -> IO (Net, Float)
+trainLoop model optim lr = P.foldM step begin done . enumerateData
+    where step :: (Net, Float) -> ((Tensor, Tensor), Int) -> IO (Net, Float)
+          step (m, l) ((x, y), i) = do
+                let y' = net m x
+                    l' = mseLoss y y'
+                    l'' = l + (asValue l' :: Float)
+
+                (m', _) <- runStep m optim l' (asTensor (lr :: Float))
+                pure (m', l'')
+
+          done = pure
+          begin = pure (model, 0.0)
+
+-- | Training Loop
+validLoop :: Net -> ListT IO (Tensor, Tensor) -> IO (Net, Float)
+validLoop model = P.foldM step begin done . enumerateData 
+    where step :: (Net, Float) -> ((Tensor, Tensor), Int) -> IO (Net, Float)
+          step (m, l) ((x, y), i) = do
+                let y' = net m x
+                    loss = asValue (l1Loss ReduceMean y y') :: Float
+                pure (model, loss)
+
+          done = pure
+          begin = pure (model, 0.0)
+                  
 ------------------------------------------------------------------------------
 -- DATA
 ------------------------------------------------------------------------------
 
 data OP = OP {dev :: Device, numBatches :: Int, opData :: OPData}
-    -- deriving (Eq, Ord, Show)
 
 instance Dataset IO OP Int (Tensor, Tensor)
-    where getItem OP {..} ix = pure ( toDevice dev . toDType Float . (!! ix) . inputs $ opData
-                                    , toDevice dev . toDType Float . (!! ix) . outputs $ opData )
+    where getItem OP {..} ix = pure ( toDevice dev . toDType Float 
+                                                   . (!! ix) . inputs $ opData
+                                    , toDevice dev . toDType Float 
+                                                   . (!! ix) . outputs $ opData )
           keys OP {..} = S.fromList [ 0 .. (numBatches - 1) ]
 
 data OPData = OPData { inputs :: [Tensor], outputs :: [Tensor] }
@@ -216,15 +244,11 @@ preprocessData lo hi mX mY pX pY splt dat bs dev
           (trainY, scalerY)          = scaleData lo hi trafoTrainY
           (validX, _)                = scaleData lo hi trafoValidX
           (validY, _)                = scaleData lo hi trafoValidY
-          trainData                  = OPData (split bs (Dim 0) . toDevice dev 
-                                                                . toDType Float 
+          trainData                  = OPData (split bs (Dim 0) . toDType Float 
                                                                 $ trainX) 
-                                              (split bs (Dim 0) . toDevice dev 
-                                                                . toDType Float 
+                                              (split bs (Dim 0) . toDType Float 
                                                                 $ trainY)
-          validData                  = OPData (split bs (Dim 0) . toDevice dev 
-                                                                . toDType Float 
+          validData                  = OPData (split bs (Dim 0) . toDType Float 
                                                                 $ validX) 
-                                              (split bs (Dim 0) . toDevice dev 
-                                                                . toDType Float 
+                                              (split bs (Dim 0) . toDType Float 
                                                                 $ validY)

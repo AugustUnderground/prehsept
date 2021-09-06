@@ -30,6 +30,7 @@ dependencies:
 - random
 - random-shuffle
 - MonadRandom
+- gnuplot
 
 library:
   source-dirs: src

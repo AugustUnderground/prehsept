@@ -36,6 +36,7 @@ library
       MonadRandom
     , base >=4.7 && <5
     , containers
+    , gnuplot
     , hasktorch
     , hnetcdf
     , libtorch-ffi
@@ -59,6 +60,7 @@ executable prehsept-exe
       MonadRandom
     , base >=4.7 && <5
     , containers
+    , gnuplot
     , hasktorch
     , hnetcdf
     , libtorch-ffi
@@ -84,6 +86,7 @@ test-suite prehsept-test
       MonadRandom
     , base >=4.7 && <5
     , containers
+    , gnuplot
     , hasktorch
     , hnetcdf
     , libtorch-ffi
