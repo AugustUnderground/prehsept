@@ -30,7 +30,12 @@ dependencies:
 - random
 - random-shuffle
 - MonadRandom
-- gnuplot
+- plotlyhs
+- lucid
+- microlens
+- wai
+- warp
+- http-types
 
 library:
   source-dirs: src
