@@ -15,8 +15,6 @@ extra-deps:
   - repa-3.4.1.4@sha256:5a99bde69fe96a18d70aae23f47c8f719b1134558dca3ee5a7c15423b68a132e,3323
   - c2hs-0.28.8@sha256:980c1a91c93e492d5412e904f2500b2ace34a421e8509529b6d98d89c51f9a2e,9208
   - hnetcdf-0.5.0.0@sha256:32bcbfd5f30b16834f98b4a71a8fa0e9440b307506999b441b3aadb8c1f8c7d1,4036
-    # - interactive-plot-0.1.0.0@sha256:27273b3baad63c369fc4e592126d7e7c5583dc8a9d7c3c716dd307bc038b2061,1844
-    # - Histogram-0.1.0.2@sha256:094e78070fa1d833cce39b4a1396324858c8811e3cb80b569b7407aea2b18e33,483
 
 extra-include-dirs:
   - libtorch/include/torch/csrc/api/include

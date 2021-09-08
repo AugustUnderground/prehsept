@@ -33,9 +33,7 @@ dependencies:
 - plotlyhs
 - lucid
 - microlens
-- wai
-- warp
-- http-types
+- time
 
 library:
   source-dirs: src
