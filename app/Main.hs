@@ -11,18 +11,18 @@ main = do
     sampledData <- M.map (take numSamples) <$> shuffleData rawData
 
     -- Train with dataset/stream
-    -- let (trainData, validData, predict) 
-    --         = preprocessData lower upper maskX maskY 
-    --                          paramsX paramsY trainSplit 
-    --                          sampledData batchSize
-    -- model <- trainNet trainData validData
+    let (trainData, validData, predict) 
+            = preprocessData lower upper maskX maskY 
+                             paramsX paramsY trainSplit 
+                             sampledData batchSize
+    model <- trainNet trainData validData
 
     -- Train with raw Tensors
-    let (trainX, trainY, validX, validY, predict)
-            = preprocessData' lower upper maskX maskY 
-                              paramsX paramsY trainSplit 
-                              sampledData
-    model <- trainNet' (trainX, trainY) (validX, validY)
+    -- let (trainX, trainY, validX, validY, predict)
+    --         = preprocessData' lower upper maskX maskY 
+    --                           paramsX paramsY trainSplit 
+    --                           sampledData
+    -- model <- trainNet' (trainX, trainY) (validX, validY)
 
     putStrLn "Done!"
     return ()
@@ -35,5 +35,5 @@ main = do
           trainSplit      = 0.8
           lower           = 0
           upper           = 1
-          numSamples      = 666666
+          numSamples      = 500000 -- 666666
           batchSize       = 2000
