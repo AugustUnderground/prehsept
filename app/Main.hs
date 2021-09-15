@@ -1,60 +1,39 @@
 module Main where
 
-import Data.Time
-import Data.List.Split
-import System.Environment
 import qualified Data.Map as M
-import Torch hiding (take, floor)
+
 import Lib
 
 main :: IO ()
 main = do
+    -- Loading Data from NetCDF
+    rawData     <- getDataFromNC ncFileName (paramsX ++ paramsY)
+    sampledData <- M.map (take numSamples) <$> shuffleData rawData
 
-    -- Current time stamp for filenames etc.
-    t <- (init . (!!1) . splitOn "." . show) . utctDayTime <$> getCurrentTime
-    d <- show . utctDay <$> getCurrentTime
+    -- Train with dataset/stream
+    -- let (trainData, validData, predict) 
+    --         = preprocessData lower upper maskX maskY 
+    --                          paramsX paramsY trainSplit 
+    --                          sampledData batchSize
+    -- model <- trainNet trainData validData
 
-    let timeStamp = d ++ "-" ++ t
-        modelFileName = modelDir ++ "/" ++ technology ++ "-" ++ modelType 
-                                 ++ "-" ++ timeStamp ++ ".pt"
+    -- Train with raw Tensors
+    let (trainX, trainY, validX, validY, predict)
+            = preprocessData' lower upper maskX maskY 
+                              paramsX paramsY trainSplit 
+                              sampledData
+    model <- trainNet' (trainX, trainY) (validX, validY)
 
-    -- Loading Data from NetCDF and shuffling
-    rawData         <- getDataFromNC ncFileName (paramsX ++ paramsY)
-    shuffledData    <- shuffleData rawData
-    let sampledData = M.map (take numSamples) shuffledData
-
-    -- Process data (no shuffling bc no more IO)
-    let (trainData, validData, eval) 
-            = preprocessData lower upper maskX maskY 
-                             paramsX paramsY trainSplit sampledData
-                             batchSize dev
-
-    model <- train trainData validData
-    
-    saveParams model modelFileName
-
-    let predict :: Tensor -> Tensor
-        predict = eval model
-
-    valid rawData predict
-
+    putStrLn "Done!"
     return ()
-    where
 
-        modelType       = "nmos"
-        technology      = "xh035"
-        ncFileName      = "/home/uhlmanny/Workspace/data/" ++ technology 
-                            ++ "-" ++ modelType ++ ".nc"
-        modelDir        = "/home/uhlmanny/Workspace/models/hs"
-        paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
-        paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
-        maskX           = [0,1,0,0]
-        maskY           = [1,0,1,0]
-        numSamples      = 500000 -- 666666
-        trainSplit      = 0.9
-        lower           = 0
-        upper           = 1
-        batchSize       = 10000
-        numWorkers      = 25
-        dev             = Device CUDA 1
-        -- dev             = Device CPU 0
+    where ncFileName      = "/home/uhlmanny/Workspace/data/xh035-nmos.nc"
+          paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
+          paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
+          maskX           = [0,1,0,0]
+          maskY           = [1,0,1,0]
+          trainSplit      = 0.8
+          lower           = 0
+          upper           = 1
+          numSamples      = 666666
+          batchSize       = 2000

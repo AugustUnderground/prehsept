@@ -1,11 +1,14 @@
+# resolver: nightly-2020-12-14
 resolver: lts-17.4
+compiler: ghc-8.10.4
 
 packages:
 - .
 
 extra-deps:
   - git: https://github.com/hasktorch/hasktorch.git
-    commit: 7bec8c01e85aa5ebf618f27122e88f50b5c75109
+    #commit: 4e846fdcd89df5c7c6991cb9d6142007a6bb0a58 # Template README (libtorch 1.8.1)
+    commit: c34996b0a401a5b1b98b5774e892fde88adaa079 # Current (libtorch 1.9.0)
     subdirs:
       - hasktorch
       - libtorch-ffi
@@ -22,5 +25,3 @@ extra-include-dirs:
 
 extra-lib-dirs:
   - ./libtorch/lib
-  - ~/miniconda3/lib
-

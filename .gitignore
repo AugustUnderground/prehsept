@@ -38,3 +38,5 @@ stack*.yaml.lock
 *.pt
 *.ckpt
 *.html
+
+models
