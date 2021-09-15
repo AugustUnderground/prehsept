@@ -32,6 +32,7 @@ $ stack run
 
 ## TODO
 
+- [ ] Fix validation loop
 - [ ] Add argument parser for training data path etc.
 - [ ] Add Tests.
 - [X] Try data loaders. 
