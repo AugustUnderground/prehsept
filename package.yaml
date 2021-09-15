@@ -30,10 +30,11 @@ dependencies:
 - random
 - random-shuffle
 - MonadRandom
-- plotlyhs
-- lucid
-- microlens
-- time
+- hvega
+  #- plotlyhs
+  #- lucid
+  #- microlens
+  #- time
 
 library:
   source-dirs: src
@@ -48,6 +49,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - prehsept
+    when:
+    - condition: false
+      other-modules: Paths_prehsept
 
 tests:
   prehsept-test:
