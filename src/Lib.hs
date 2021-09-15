@@ -152,17 +152,17 @@ trainNet trainData validData = do
                 ++ show (l' / fromIntegral numTrainBatches)
 
         -- Validation
-        (m'', l'') <- runContT (streamFromMap opts trainSet)
-                        $ validLoop m . fst
+        -- (m'', l'') <- runContT (streamFromMap opts trainSet)
+        --                 $ validLoop m . fst
 
-        putStrLn $ show e ++  " | Validation Loss (MAE): " 
-                ++ show (l'' / fromIntegral numValidBatches)
+        -- putStrLn $ show e ++  " | Validation Loss (MAE): " 
+        --         ++ show (l'' / fromIntegral numValidBatches)
 
         return m'
     
     -- Save final model
     save (toDependent <$> flattenParameters model') ptFile
-    saveParams (flattenParameters model') ptFile
+    saveParams (flattenParameters model') ckptFile
 
     return model'
 
@@ -184,6 +184,7 @@ trainNet trainData validData = do
                                , numBatches = numValidBatches
                                , opData = validData }
           ptFile          = "./models/prehsept/model.pt"
+          ckptFile        = "./models/prehsept/model.ckpt"
 
 -- | Training with raw Tensors, no streams/datasets
 trainNet' :: (Tensor, Tensor) -> (Tensor, Tensor) -> IO Net
@@ -245,7 +246,7 @@ trainNet' (trainX, trainY) (validX, validY) = do
 
     -- Save final model
     save (toDependent <$> flattenParameters trainedModel) ptFile
-    saveParams (flattenParameters trainedModel) ptFile
+    saveParams (flattenParameters trainedModel) ckptFile
 
     return trainedModel
     where opts            = datasetOpts 25
@@ -260,6 +261,7 @@ trainNet' (trainX, trainY) (validX, validY) = do
                                       . withDevice computingDevice
                                       $ defaultOpts )
           ptFile          = "./models/prehsept/model.pt"
+          ckptFile        = "./models/prehsept/model.ckpt"
 
 ------------------------------------------------------------------------------
 -- DATA
