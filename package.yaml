@@ -24,6 +24,7 @@ dependencies:
 - containers
 - vector
 - hnetcdf
+- deepseq
 - pipes
 - text
 - split
