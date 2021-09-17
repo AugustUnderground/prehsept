@@ -183,7 +183,7 @@ trainNet !trainData !validData = do
           paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
           numX            = length paramsX
           numY            = length paramsY
-          numEpochs       = 42
+          numEpochs       = 666
           learningRate    = asTensor' (1.0e-3 :: Double) ( withDType Double 
                                                          . withDevice computingDevice 
                                                          $ defaultOpts )

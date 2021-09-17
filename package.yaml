@@ -32,6 +32,7 @@ dependencies:
 - random-shuffle
 - MonadRandom
 - hvega
+- time
   #- plotlyhs
   #- lucid
   #- microlens

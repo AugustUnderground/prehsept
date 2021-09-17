@@ -4,52 +4,55 @@ module Main where
 
 import Debug.Trace
 import qualified Data.Map as M
+import Data.Time.Clock
 
 import Lib
 
 main :: IO ()
 main = do
+    --- Get current timestamp for file name
+    ts <- concatMap (\p -> [if c == ':' || c == '.' then '-' else c | c <- p]) 
+        . init . words . show <$> getCurrentTime
+
     --- Loading Data from NetCDF
     rawData     <- getDataFromNC ncFileName (paramsX ++ paramsY ++ ["W"])
     sampledData <- M.map (take numSamples) <$> shuffleData rawData
 
     ------ TRAINING
-    --- Train with dataset/stream
+    --- Process training data
     let (trainData, validData, predict) 
             = preprocessData lower upper maskX maskY 
                              paramsX paramsY trainSplit 
                              sampledData batchSize
 
-    -- model <- trainNet trainData validData
-
-    --- Train with raw Tensors
-    -- let (trainX, trainY, validX, validY, predict)
-    --         = preprocessData' lower upper maskX maskY 
-    --                           paramsX paramsY trainSplit 
-    --                           sampledData
-    --
-    -- model <- trainNet' (trainX, trainY) (validX, validY)
+    
+    --- Train with dataset/stream
+    model <- trainNet trainData validData
 
     --- Save trained model
-    -- saveNet model ptFile
+    saveNet model (modelPrefix ++ ts ++ ".pt")
 
     ------ EVALUATION
     --- Load trained model
-    model' <- loadNet ptFile numX numY
+    -- model' <- loadNet ptFile numX numY
 
     --- Extract the prediction method
-    let predict' = predict model'
+    -- let predict' = predict model'
 
     --- Make predictions and plot vs. ground truth
-    plotPredictionVsTruth rawData predict' "gmoverid" "idoverw"
+    -- plotPredictionVsTruth rawData predict' "gmoverid" "idoverw"
 
+    ------ DONE
     putStrLn "``'-.,_,.-'``'-.,_,.='``'-., DONE ,.-'``'-.,_,.='``'-.,_,.='``"
     return ()
 
     where 
-
-          ncFileName      = "/home/uhlmanny/Workspace/data/xh035-nmos.nc"
-          ptFile          = "../models/prehsept/model.pt"
+          technology      = "xh035"
+          deviceType      = "nmos"
+          ncFileName      = "/home/uhlmanny/Workspace/data/" 
+                          ++ technology ++ "-" ++ deviceType  ++ ".nc"
+          modelPrefix     = "../models/prehsept/" ++ technology 
+                          ++ "-" ++ deviceType ++ "-"
           paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
           paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
           numX            = length paramsX
@@ -59,5 +62,5 @@ main = do
           trainSplit      = 0.8
           lower           = 0
           upper           = 1
-          numSamples      = 500000 -- 666666
+          numSamples      = 600000 -- 666666
           batchSize       = 2000
