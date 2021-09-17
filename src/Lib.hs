@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -11,14 +13,18 @@
 module Lib ( NetSpec (..)
            , Net
            , net
+           , toTensor
            , toDoubleGPU
            , toFloatCPU
            , trainNet
            , trainNet'
+           , saveNet
+           , loadNet
            , getDataFromNC
            , shuffleData
            , preprocessData
            , preprocessData'
+           , plotPredictionVsTruth
            ) where
 
 import Pipes
@@ -33,13 +39,19 @@ import Data.List.Split hiding (split)
 import Foreign.C
 import GHC.Generics
 import System.Random.Shuffle
+import Control.DeepSeq
 import Control.Monad.Random hiding (fromList, split)
 import Control.Monad.Cont (runContT)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text as T
 import qualified Data.List as L
 import qualified Data.Vector.Storable as SV
 import Graphics.Vega.VegaLite hiding (sample, shape)
+
+------------------------------------------------------------------------------
+-- UTILITIES
+------------------------------------------------------------------------------
 
 -- | Main Computing Device
 computingDevice :: Device
@@ -136,7 +148,7 @@ validLoop model = P.foldM step begin done . enumerateData
                   
 -- | Training with Datasets/Streams
 trainNet :: OPData -> OPData -> IO Net
-trainNet trainData validData = do
+trainNet !trainData !validData = do
     -- Neural Network Setup
     initModel <- toDoubleGPU <$> sample (NetSpec numX numY)
 
@@ -183,8 +195,8 @@ trainNet trainData validData = do
           validSet        = OP { opdev = computingDevice
                                , numBatches = numValidBatches
                                , opData = validData }
-          ptFile          = "./models/prehsept/model.pt"
-          ckptFile        = "./models/prehsept/model.ckpt"
+          ptFile          = "../models/prehsept/model.pt"
+          ckptFile        = "../models/prehsept/model.ckpt"
 
 -- | Training with raw Tensors, no streams/datasets
 trainNet' :: (Tensor, Tensor) -> (Tensor, Tensor) -> IO Net
@@ -260,8 +272,14 @@ trainNet' (trainX, trainY) (validX, validY) = do
                                       ( withDType Double
                                       . withDevice computingDevice
                                       $ defaultOpts )
-          ptFile          = "./models/prehsept/model.pt"
-          ckptFile        = "./models/prehsept/model.ckpt"
+          ptFile          = "../models/prehsept/model.pt"
+          ckptFile        = "../models/prehsept/model.ckpt"
+
+saveNet :: Net -> String -> IO ()
+saveNet = saveParams
+
+loadNet :: String -> Int -> Int -> IO Net
+loadNet fp numX numY = sample (NetSpec numX numY) >>= flip loadParams fp
 
 ------------------------------------------------------------------------------
 -- DATA
@@ -296,6 +314,7 @@ getDataFromNC fileName params = do
                     Right vec <- get ncFile var :: SVRet CDouble
                     let val = map realToFrac (SV.toList vec)
                     return val)
+    vals `deepseq` closeFile ncFile
     return (M.fromList $ zip params vals)
 
 -- | Randomly Shuffles data
@@ -373,6 +392,13 @@ scaleData a b x = ( ((x - xMin) * (b' - a')) / (xMax - xMin)
           a' = toTensor (a :: Double)
           b' = toTensor (b :: Double)
           
+scaleData'' :: Double -> Double -> Tensor -> Tensor -> Tensor
+scaleData'' a b s x = ((x - xMin) * (b' - a')) / (xMax - xMin)
+    where xMin = Torch.select 0 0 s
+          xMax = Torch.select 0 1 s
+          a' = toTensor (a :: Double)
+          b' = toTensor (b :: Double)
+
 -- | Un-Scale data where x ∈ [a;b] for a given min and max.
 scaleData' :: Double -> Double -> Tensor -> Tensor -> Tensor
 scaleData' a b s y = ((y - a') / (b' - a') * (xMax - xMin)) + xMin
@@ -402,30 +428,32 @@ preprocessData :: Double -> Double -> [Int] -> [Int] -> [String] -> [String]
                 -> (OPData, OPData, Net -> Tensor -> Tensor)
 preprocessData lo hi mX mY pX pY splt dat bs
         = (trainData, validData, predict)
-    where (rawTrain, rawValid)       = splitData dat splt
-          (rawTrainX, rawTrainY)     = xyData rawTrain pX pY
-          (rawValidX, rawValidY)     = xyData rawValid pX pY
-          trafoTrainX                = transformData mX rawTrainX
-          trafoTrainY                = transformData mY rawTrainY
-          trafoValidX                = transformData mX rawValidX
-          trafoValidY                = transformData mY rawValidY
-          (trainX, scalerX)          = scaleData lo hi trafoTrainX
-          (trainY, scalerY)          = scaleData lo hi trafoTrainY
-          (validX, _)                = scaleData lo hi trafoValidX
-          (validY, _)                = scaleData lo hi trafoValidY
-          trainData                  = OPData (split bs (Dim 0) . toDevice computingDevice
-                                                                . toDType Double 
-                                                                $ trainX) 
-                                              (split bs (Dim 0) . toDevice computingDevice 
-                                                                . toDType Double 
-                                                                $ trainY)
-          validData                  = OPData (split bs (Dim 0) . toDType Double 
-                                                                $ validX) 
-                                              (split bs (Dim 0) . toDType Double 
-                                                                $ validY)
+    where (rawTrain, rawValid)    = splitData dat splt
+          (rawTrainX, rawTrainY)  = xyData rawTrain pX pY
+          (rawValidX, rawValidY)  = xyData rawValid pX pY
+          trafoTrainX             = transformData mX rawTrainX
+          trafoTrainY             = transformData mY rawTrainY
+          trafoValidX             = transformData mX rawValidX
+          trafoValidY             = transformData mY rawValidY
+          (trainX, scalerX)       = scaleData lo hi trafoTrainX
+          (trainY, scalerY)       = scaleData lo hi trafoTrainY
+          (validX, _)             = scaleData lo hi trafoValidX
+          (validY, _)             = scaleData lo hi trafoValidY
+          trainData               = OPData (split bs (Dim 0) . toDevice computingDevice
+                                                             . toDType Double 
+                                                             $ trainX) 
+                                           (split bs (Dim 0) . toDevice computingDevice 
+                                                             . toDType Double 
+                                                             $ trainY)
+          validData               = OPData (split bs (Dim 0) . toDType Double 
+                                                             $ validX) 
+                                           (split bs (Dim 0) . toDType Double 
+                                                             $ validY)
           predict :: Net -> Tensor -> Tensor
-          predict m x = transformData' mY . scaleData' lo hi scalerY . net m 
-                      . fst . scaleData lo hi . transformData mX $ x
+          predict m x = transformData' mY . scaleData' lo hi scalerY 
+                      . net m 
+                      . scaleData'' lo hi scalerX . transformData mX 
+                      $ x
 
 -- | 'preprocessData' is a convenience function to clean up main.
 -- | Arguments:
@@ -465,87 +493,83 @@ preprocessData' lo hi mX mY pX pY s d = ( trainX, trainY, validX, validY
 -- VALIDATION
 ------------------------------------------------------------------------------
 
--- valid :: M.Map String [Double] -> (Tensor -> Tensor) -> IO ()
--- valid d p = do
--- 
---     return ()
---     where 
---         params = M.keys d
---         Just vds = L.elemIndex "Vds" params
---         Just vgs = L.elemIndex "Vgs" params
---         Just vbs = L.elemIndex "Vbs" params
---         Just gm  = L.elemIndex "gmoverid" params
---         Just l   = L.elemIndex "L" params
---         Just ll  = (!!3) . L.nub <$> M.lookup "L" d
---         Just w   = L.elemIndex "W" params
---         Just ww  = (!!3) . L.nub <$> M.lookup "W" d
---         fd = \f -> (roundn (f !! vds) 2 == 1.65) 
---                  && ((f !! l) == ll) 
---                  && ((f !! w) == ww) 
---                  && (roundn (f !! vbs) 2 == 0.00)
---   
---         traceData   = sortData gm . filterData fd $ d
---         Just traceX = M.lookup "gmoverid" traceData
---         Just traceY = M.lookup "idoverw" traceData
---         paramsX     = ["gmoverid", "fug", "Vds", "Vbs"]
---         paramsY     = ["idoverw", "L", "W", "gdsoverw", "Vgs"]
---         xs      = transpose (Dim 0) (Dim 1) . asTensor 
---                     $ (mapMaybe (`M.lookup` traceData) paramsX :: [[Double]])
---         ys     = asValue (p xs) :: [[Double]]
---         traceY'     = (!! 0) . L.transpose $ ys
---         plotFile    = "/home/uhlmanny/Workspace/plots/valid.html"
+plotVS :: FilePath -> T.Text -> T.Text -> [(Double, (Double, Double))] -> IO ()
+plotVS pf xl yl xyy = toHtmlFile pf 
+                    $ toVegaLite [ dt []
+                                 , mark Line []
+                                 , enc []
+                                 , height 1000
+                                 , width 1000 ]
+    where axis = PAxis [ AxValues (Numbers (map fst xyy)) ]
+          enc  = encoding . position X [ PName xl, PmType Quantitative, axis ]
+                          . position Y [ PName yl, PmType Quantitative 
+                                       , PScale [SType ScLog] ]
 
-plotData :: IO ()
-plotData = do
-    rawData <- getDataFromNC ncFileName (paramsX ++ paramsY)
+                          . color [ MName "Lines", MmType Nominal ]
+          dt   = foldl (\sum' (x, (y, y')) ->
+                            sum' . dataRow [ (xl, Number x) 
+                                           , (yl, Number y)
+                                           , ("Lines", Str "Truth") ]
+                                 . dataRow [ (xl, Number x) 
+                                           , (yl, Number y')
+                                           , ("Lines", Str "Prediction") ]
+                       ) (dataFromRows []) xyy
+ 
+-- | Retrieves ground truth from raw dataset and predictions from model, in the
+-- | from [(TruX, (TruY, PrdY))].
+traceData :: M.Map String [Double] -> (Tensor -> Tensor) -> String -> String 
+          -> [(Double, (Double, Double))]
+traceData dat prd xParam yParam = zip truX $ zip truY prdY
+    where params   = M.keys dat
+          Just vds = L.elemIndex "Vds" params
+          Just vgs = L.elemIndex "Vgs" params
+          Just vbs = L.elemIndex "Vbs" params
+          Just l   = L.elemIndex "L" params
+          Just ll  = (!!3) . L.nub <$> M.lookup "L" dat
+          Just w   = L.elemIndex "W" params
+          Just ww  = (!!3) . L.nub <$> M.lookup "W" dat
 
-    let params   = M.keys rawData
-        Just vds = L.elemIndex "Vds" params
-        Just vgs = L.elemIndex "Vgs" params
-        Just vbs = L.elemIndex "Vbs" params
-        Just gm  = L.elemIndex "gmoverid" params
-        Just l   = L.elemIndex "L" params
-        Just ll  = (!!3) . L.nub <$> M.lookup "L" rawData
-        Just w   = L.elemIndex "W" params
-        Just ww  = (!!3) . L.nub <$> M.lookup "W" rawData
-        fd = (\d -> (roundn (d !! vds) 2 == 1.65) 
-                 && ((d !! l) == ll) 
-                 && ((d !! w) == ww) 
-                 && (roundn (d !! vbs) 2 == 0.00))
+          fd       = \d -> (roundn (d !! vds) 2 == 1.65) 
+                            && ((d !! l) == ll) 
+                            && ((d !! w) == ww) 
+                            && (roundn (d !! vbs) 2 == 0.00)
 
-    let traceData   = sortData gm . filterData fd $ rawData
-        Just traceX = M.lookup "gmoverid" traceData
-        Just traceY = M.lookup "idoverw" traceData
-        traceXY :: [(Double, Double)]
-        traceXY = zip (map realToFrac traceX) (map realToFrac traceY)
-    
-    let axis = PAxis [AxValues (Numbers (map fst traceXY))]
-        enc  = encoding . position X [ PName xlabel
-                                     , PmType Quantitative, axis ]
-                        . position Y [ PName ylabel
-                                     , PmType Quantitative
-                                     , PScale [SType ScLog] ]
-                        . color [ MName "Lines", MmType Nominal ]
-        dt = foldl (\sum' (x, y) ->
-                        sum' . dataRow [ (xlabel, Number x)
-                                       , (ylabel, Number y)
-                                       , ("Lines", Str "Truth") ] 
-                   ) (dataFromRows []) traceXY
-    
-    toHtmlFile plotFile $ toVegaLite [ dt []
-                                     , mark Line []
-                                     , enc []
-                                     , height 1000
-                                     , width 1000 ]
-                                    
-    where ncFileName      = "/home/uhlmanny/Workspace/data/xh035-nmos.nc"
-          modelFileName   = "./model.pt"
+          Just xp   = L.elemIndex xParam params
+          truData   = sortData xp . filterData fd $ dat
+          Just truX = M.lookup xParam truData
+          Just truY = M.lookup yParam truData
+
+          paramsX   = ["gmoverid", "fug", "Vds", "Vbs"]
+          paramsY   = ["idoverw", "L", "gdsoverw", "Vgs"]
+          Just yp   = L.elemIndex yParam paramsY
+          truX'     = transpose (Dim 0) (Dim 1) . toTensor 
+                    $ (mapMaybe (`M.lookup` truData) paramsX :: [[Double]])
+          input     = toTensor truX'
+          output    = prd input
+          prdY'     = asValue (transpose (Dim 0) (Dim 1) output) :: [[Double]]
+          prdY      = prdY' !! yp
+
+-- | Plot data vs prediciton :: <path/to/data> -> <path/to/model> -> IO ()
+-- |    Example Data: "/home/uhlmanny/Workspace/data/xh035-nmos.nc"
+-- |    Example Model  "../../models/prehsept/model.pt"
+plotPredictionVsTruth :: M.Map String [Double]  -- Raw Data Set
+                      -> (Tensor -> Tensor)     -- Model predicition function
+                      -> String -> String       -- X and Y Parameter
+                      -> IO ()
+plotPredictionVsTruth d p x y = plotVS plotFile xLabel yLabel $ traceData d p x y
+    -- do  
+    --      let t = traceData d p x y
+    --      print $ [fst x | x <- t]
+    --      print $ [fst . snd $ x | x <- t]
+    --      print $ [snd . snd $ x | x <- t]
+    --      plotVS plotFile xLabel yLabel t
+    where 
           paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
           paramsY         = ["idoverw", "L", "W", "gdsoverw", "Vgs"]
           maskX           = [0,1,0,0]
           maskY           = [1,0,1,0]
           numX            = length paramsX
           numY            = length paramsY
-          plotFile        = "/home/uhlmanny/Workspace/plots/data.html"
-          xlabel          = "gm/Id in 1/V"
-          ylabel          = "Id/W in A/m"
+          xLabel          = "gm/Id in 1/V"
+          yLabel          = "Id/W in A/m"                                   
+          plotFile        = "../plots/" ++ x ++ "-vs-" ++ y ++ ".html"
