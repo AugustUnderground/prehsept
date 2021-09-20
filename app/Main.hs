@@ -49,6 +49,7 @@ train = do
           lower           = 0
           upper           = 1
           numSamples      = 500000
+          --numSamples      = 200000
           batchSize       = 2000
 
 eval :: IO ()
@@ -77,7 +78,7 @@ eval = do
           deviceType      = "nmos"
           ncFileName      = "/home/uhlmanny/Workspace/data/" 
                           ++ technology ++ "-" ++ deviceType  ++ ".nc"
-          ptFile          = "../models/prehsept/xh035-nmos-2021-09-1713-23-08-627775366.pt"
+          ptFile          = "../models/prehsept/xh035-nmos-2021-09-2012-08-12-334929576.pt"
           paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
           paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
           numX            = length paramsX

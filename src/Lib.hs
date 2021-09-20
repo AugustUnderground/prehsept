@@ -118,21 +118,21 @@ toFloatCPU = over (types @ Tensor @a) (toDevice computingDevice . toType Float)
 ------------------------------------------------------------------------------
 
 -- | Training Loop
-trainLoop :: Optimizer o => Net -> o -> Tensor -> ListT IO (Tensor, Tensor) 
-          -> IO (Net, Double)
+trainLoop :: Optimizer opt => Net -> opt -> Tensor -> ListT IO (Tensor, Tensor) 
+          -> IO (Net, opt, Double)
 trainLoop model optim lr = P.foldM step begin done . enumerateData
-    where step :: (Net, Double) -> ((Tensor, Tensor), Int) -> IO (Net, Double)
-          -- step (m, l) ((x, y), i) = do
-          step (m, l) ((x, y), _) = do
+    where step :: Optimizer opt' => (Net, opt', Double) -> ((Tensor, Tensor), Int) 
+               -> IO (Net, opt', Double)
+          step (m, o, l) ((x, y), i) = do
                 let y' = net m x
                     l' = mseLoss y y'
                     l'' = l + (asValue l' :: Double)
 
-                (m', _) <- runStep m optim l' lr
-                pure (m', l'')
+                (m', o') <- runStep m o l' lr
+                pure (m', o', l'')
 
           done = pure
-          begin = pure (model, 0.0)
+          begin = pure (model, optim, 0.0)
 
 -- | Validation Loop
 validLoop :: Net -> ListT IO (Tensor, Tensor) -> IO (Net, Double)
@@ -153,24 +153,24 @@ trainNet !trainData !validData = do
     initModel <- toDoubleGPU <$> sample (NetSpec numX numY)
 
     -- Initialize Adam Optimizer
-    let optim = mkAdam 0 0.9 0.999 (flattenParameters initModel)
+    let initOptim = mkAdam 0 0.9 0.999 (flattenParameters initModel)
 
-    model' <- foldLoop initModel numEpochs $ \m e -> do
+    (model', optim') <- foldLoop (initModel, initOptim) numEpochs $ \(m,o) e -> do
         -- Training
-        (m', l') <- runContT (streamFromMap opts trainSet)
-                        $ trainLoop m optim learningRate . fst
+        (m', o', l') <- runContT (streamFromMap opts trainSet)
+                        $ trainLoop m o learningRate . fst
 
         putStrLn $ show e ++  " | Training Loss (MSE): " 
                 ++ show (l' / fromIntegral numTrainBatches)
 
         -- Validation
-        -- (m'', l'') <- runContT (streamFromMap opts trainSet)
-        --                 $ validLoop m . fst
+        --(m'', l'') <- runContT (streamFromMap opts trainSet)
+        --                $ validLoop m . fst
 
-        -- putStrLn $ show e ++  " | Validation Loss (MAE): " 
-        --         ++ show (l'' / fromIntegral numValidBatches)
+        --putStrLn $ show e ++  " | Validation Loss (MAE): " 
+        --        ++ show (l'' / fromIntegral numValidBatches)
 
-        return m'
+        return (m', o')
     
     -- Save final model
     save (toDependent <$> flattenParameters model') ptFile
@@ -183,7 +183,8 @@ trainNet !trainData !validData = do
           paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
           numX            = length paramsX
           numY            = length paramsY
-          numEpochs       = 666
+          numEpochs       = 123
+          --numEpochs       = 666
           learningRate    = asTensor' (1.0e-3 :: Double) ( withDType Double 
                                                          . withDevice computingDevice 
                                                          $ defaultOpts )
