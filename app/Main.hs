@@ -1,15 +1,15 @@
-{-# LANGUAGE BangPatterns #-}
-
 module Main where
 
-import Debug.Trace
 import qualified Data.Map as M
 import Data.Time.Clock
 
 import Lib
 
 main :: IO ()
-main = do
+main = train
+
+train :: IO ()
+train = do
     --- Get current timestamp for file name
     ts <- concatMap (\p -> [if c == ':' || c == '.' then '-' else c | c <- p]) 
         . init . words . show <$> getCurrentTime
@@ -24,7 +24,6 @@ main = do
             = preprocessData lower upper maskX maskY 
                              paramsX paramsY trainSplit 
                              sampledData batchSize
-
     
     --- Train with dataset/stream
     model <- trainNet trainData validData
@@ -32,22 +31,9 @@ main = do
     --- Save trained model
     saveNet model (modelPrefix ++ ts ++ ".pt")
 
-    ------ EVALUATION
-    --- Load trained model
-    -- model' <- loadNet ptFile numX numY
-
-    --- Extract the prediction method
-    -- let predict' = predict model'
-
-    --- Make predictions and plot vs. ground truth
-    -- plotPredictionVsTruth rawData predict' "gmoverid" "idoverw"
-
-    ------ DONE
     putStrLn "``'-.,_,.-'``'-.,_,.='``'-., DONE ,.-'``'-.,_,.='``'-.,_,.='``"
-    return ()
 
-    where 
-          technology      = "xh035"
+    where technology      = "xh035"
           deviceType      = "nmos"
           ncFileName      = "/home/uhlmanny/Workspace/data/" 
                           ++ technology ++ "-" ++ deviceType  ++ ".nc"
@@ -62,5 +48,43 @@ main = do
           trainSplit      = 0.8
           lower           = 0
           upper           = 1
-          numSamples      = 600000 -- 666666
+          numSamples      = 500000
+          batchSize       = 2000
+
+eval :: IO ()
+eval = do
+    --- Loading Data from NetCDF
+    rawData     <- getDataFromNC ncFileName (paramsX ++ paramsY ++ ["W"])
+
+    let (trainData, validData, predict) 
+            = preprocessData lower upper maskX maskY 
+                             paramsX paramsY trainSplit 
+                             rawData batchSize
+
+    --- Load trained model
+    model' <- loadNet ptFile numX numY
+
+    --- Extract the prediction method
+    let predict' = predict model'
+
+    --- Make predictions and plot vs. ground truth
+    plotPredictionVsTruth rawData predict' "gmoverid" "idoverw"
+
+    ------ DONE
+    putStrLn "``'-.,_,.-'``'-.,_,.='``'-., DONE ,.-'``'-.,_,.='``'-.,_,.='``"
+ 
+    where technology      = "xh035"
+          deviceType      = "nmos"
+          ncFileName      = "/home/uhlmanny/Workspace/data/" 
+                          ++ technology ++ "-" ++ deviceType  ++ ".nc"
+          ptFile          = "../models/prehsept/xh035-nmos-2021-09-1713-23-08-627775366.pt"
+          paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
+          paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
+          numX            = length paramsX
+          numY            = length paramsY
+          maskX           = [0,1,0,0]
+          maskY           = [1,0,1,0]
+          trainSplit      = 0.8
+          lower           = 0
+          upper           = 1
           batchSize       = 2000

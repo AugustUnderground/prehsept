@@ -149,10 +149,10 @@ validLoop model = P.foldM step begin done . enumerateData
 -- | Training with Datasets/Streams
 trainNet :: OPData -> OPData -> IO Net
 trainNet !trainData !validData = do
-    -- Neural Network Setup
+    -- Initialize Neural Network
     initModel <- toDoubleGPU <$> sample (NetSpec numX numY)
 
-    -- Optimizer
+    -- Initialize Adam Optimizer
     let optim = mkAdam 0 0.9 0.999 (flattenParameters initModel)
 
     model' <- foldLoop initModel numEpochs $ \m e -> do
@@ -346,7 +346,7 @@ filterData f m = M.fromList . zip p . L.transpose . L.filter f
 splitData :: M.Map String [Double] -> Double 
           -> (M.Map String [Double], M.Map String [Double])
 splitData m s = ( M.map (take numTrainSamples) m
-                     , M.map (drop numTrainSamples) m )
+                , M.map (drop numTrainSamples) m )
     where (Just numSamples) = fmap length (M.lookup (head (M.keys m)) m)
           numTrainSamples   = floor . (* s) . fromIntegral $ numSamples
 
@@ -360,11 +360,11 @@ xyData m x y = ( toTensor' (mapMaybe (`M.lookup` m) x :: [[Double]])
 -- | masked with an [Int].
 transformData :: [Int] -> Tensor -> Tensor
 transformData m t = (+ t') . (* m') 
-                  . Torch.transpose (Dim 0) (Dim 1) 
+                  . transpose (Dim 0) (Dim 1) 
                   . Torch.log
                   . (+ toTensor (1 :: Double))
                   . Torch.abs 
-                  . Torch.transpose (Dim 0) (Dim 1) 
+                  . transpose (Dim 0) (Dim 1) 
                   $ t
     where m' = asTensor' (m :: [Int]) (withDType Int32 . withDevice computingDevice $ defaultOpts)
           t' = t * (1 - m')
@@ -392,6 +392,7 @@ scaleData a b x = ( ((x - xMin) * (b' - a')) / (xMax - xMin)
           a' = toTensor (a :: Double)
           b' = toTensor (b :: Double)
           
+-- | Scale datapoints for given min and max values.
 scaleData'' :: Double -> Double -> Tensor -> Tensor -> Tensor
 scaleData'' a b s x = ((x - xMin) * (b' - a')) / (xMax - xMin)
     where xMin = Torch.select 0 0 s
