@@ -6,7 +6,8 @@ import Data.Time.Clock
 import Lib
 
 main :: IO ()
-main = train
+-- main = train
+main = eval "../models/prehsept/xh035-nmos-2021-09-2016-37-46-687795907.pt"
 
 train :: IO ()
 train = do
@@ -52,8 +53,8 @@ train = do
           --numSamples      = 200000
           batchSize       = 2000
 
-eval :: IO ()
-eval = do
+eval :: String -> IO ()
+eval ptFile = do
     --- Loading Data from NetCDF
     rawData     <- getDataFromNC ncFileName (paramsX ++ paramsY ++ ["W"])
 
@@ -78,7 +79,6 @@ eval = do
           deviceType      = "nmos"
           ncFileName      = "/home/uhlmanny/Workspace/data/" 
                           ++ technology ++ "-" ++ deviceType  ++ ".nc"
-          ptFile          = "../models/prehsept/xh035-nmos-2021-09-2012-08-12-334929576.pt"
           paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
           paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
           numX            = length paramsX

@@ -31,6 +31,7 @@ import Pipes
 import qualified Pipes.Prelude as P
 import Torch hiding (take, floor)
 import Torch.Lens
+import Torch.Functional.Internal (isinf)
 import Data.NetCDF
 import Data.NetCDF.Vector
 import Data.Function (on)
@@ -357,20 +358,24 @@ xyData m x y = ( toTensor' (mapMaybe (`M.lookup` m) x :: [[Double]])
                , toTensor' (mapMaybe (`M.lookup` m) y :: [[Double]]) )
     where toTensor' = transpose (Dim 0) (Dim 1) . toTensor
 
--- | Applys `ln|x|` to each feature x of the given tensor. Where `x` can be
+-- | Replaces all ∞ with zero
+zeroInf :: Tensor -> Tensor
+zeroInf t = maskedFill t (isinf t) (toTensor (0.0 :: Double))
+
+-- | Applys `ln(|x| + 1)` to each feature x of the given tensor. Where `x` can be
 -- | masked with an [Int].
 transformData :: [Int] -> Tensor -> Tensor
 transformData m t = (+ t') . (* m') 
                   . transpose (Dim 0) (Dim 1) 
+                  . zeroInf
                   . Torch.log
-                  . (+ toTensor (1 :: Double))
                   . Torch.abs 
                   . transpose (Dim 0) (Dim 1) 
                   $ t
     where m' = asTensor' (m :: [Int]) (withDType Int32 . withDevice computingDevice $ defaultOpts)
           t' = t * (1 - m')
 
--- | Applys `e^x` to each column x of the given tensor. Where `x` can be masked
+-- | Applys `(e^x) - 1` to each column x of the given tensor. Where `x` can be masked
 -- | with [Int].
 transformData' :: [Int] -> Tensor -> Tensor
 transformData' m t = (+ t') . (* m') 
