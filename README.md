@@ -41,6 +41,8 @@ and observe these sweet succulent plots
 - [ ] Fix validation loop
 - [ ] Add argument parser for training data path etc.
 - [ ] Add Tests.
+- [ ] Weighted data sampling
+- [ ] Better weight init (xavier maybe?)
 - [X] Try data loaders. 
 - [X] Move training loop to Lib.
 - [X] Plots
