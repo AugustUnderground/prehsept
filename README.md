@@ -24,11 +24,15 @@ Build the project with stack
 $ stack build
 ```
 
-and run
+then run it
 
 ```sh
 $ stack run
 ```
+
+and observe these sweet succulent plots
+
+![](./doc/visualization.svg)
 
 ## TODO
 
