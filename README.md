@@ -34,6 +34,8 @@ and observe these sweet succulent plots
 
 ![](./doc/visualization.svg)
 
+... I know it sucks ...
+
 ## TODO
 
 - [ ] Fix validation loop
