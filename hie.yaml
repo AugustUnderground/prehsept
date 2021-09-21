@@ -3,10 +3,7 @@ cradle:
     - path: "./src"
       component: "prehsept:lib"
 
-    - path: "./app/Main.hs"
-      component: "prehsept:exe:prehsept-exe"
-
-    - path: "./app/Paths_prehsept.hs"
+    - path: "./app"
       component: "prehsept:exe:prehsept-exe"
 
     - path: "./test"
