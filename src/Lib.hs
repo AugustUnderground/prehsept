@@ -75,41 +75,35 @@ data Net = Net { l0 :: Linear
                , l5 :: Linear
                , l6 :: Linear
                , l7 :: Linear
-               , l8 :: Linear
-               , l9 :: Linear
                }
     deriving (Generic, Show, Torch.Parameterized)
 
 -- | Neural Network Weight initialization
 instance Randomizable NetSpec Net where
-    sample NetSpec {..} = Net <$> sample (LinearSpec numX   32)     -- Layer 0
-                              <*> sample (LinearSpec 32     128)    -- Layer 1
-                              <*> sample (LinearSpec 128    256)    -- Layer 2
-                              <*> sample (LinearSpec 256    512)    -- Layer 3
-                              <*> sample (LinearSpec 512    1024)   -- Layer 4
-                              <*> sample (LinearSpec 1024   512)    -- Layer 5
-                              <*> sample (LinearSpec 512    256)    -- Layer 6
-                              <*> sample (LinearSpec 256    128)    -- Layer 7
-                              <*> sample (LinearSpec 128    32)     -- Layer 8
-                              <*> sample (LinearSpec 32     numY)   -- Layer 9
+    sample NetSpec {..} = Net <$> sample (LinearSpec numX   16)     -- Layer 0
+                              <*> sample (LinearSpec 16     64)     -- Layer 1
+                              <*> sample (LinearSpec 64     256)    -- Layer 2
+                              <*> sample (LinearSpec 256    512)   -- Layer 3
+                              <*> sample (LinearSpec 512   256)    -- Layer 4
+                              <*> sample (LinearSpec 256    64)     -- Layer 5
+                              <*> sample (LinearSpec 64     16)     -- Layer 6
+                              <*> sample (LinearSpec 16     numY)   -- Layer 7
 
 -- | Neural Network Forward Pass
 net :: Net -> Tensor -> Tensor
-net Net {..} = linear l9 . relu
-             . linear l8 . relu
-             . linear l7 . relu
+net Net {..} = linear l7 . relu
              . linear l6 . relu
              . linear l5 . relu
              . linear l4 . relu
              . linear l3 . relu
              . linear l2 . relu
              . linear l1 . relu
-             . linear l0 . relu
+             . linear l0
 
---linearXavier :: [Int] -> Linear
---linearXavier [i,o] = Linear { weight = xavierUniform' [o,i] >>= makeIndependent
---                            , bias = xavierUniform' [o,1] >>= makeIndependent <$> reshape [1]
---                            }
+-- linearXavier :: [Int] -> Linear
+-- linearXavier [i,o] = Torch.Linear { weight = xavierUniform' [o,i] >>= makeIndependent
+--                             , bias = xavierUniform' [o,1] >>= makeIndependent <$> reshape [1]
+--                             }
 
 -- | Convert model to Double on GPU
 toDoubleGPU :: forall a. HasTypes a Tensor => a -> a
@@ -190,8 +184,8 @@ trainNet !trainData !validData = do
           paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
           numX            = length paramsX
           numY            = length paramsY
-          --numEpochs       = 123
-          numEpochs       = 666
+          numEpochs       = 123
+          --numEpochs       = 666
           learningRate    = asTensor' (1.0e-3 :: Double) 
                                       ( withDType Double 
                                       . withDevice computingDevice 

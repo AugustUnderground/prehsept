@@ -7,7 +7,7 @@ import Lib
 
 main :: IO ()
 --main = train
-main = eval "../models/prehsept/xh035-nmos-2021-09-2105-56-44-204791151.pt"
+main = eval "../models/prehsept/xh035-nmos-2021-09-2115-32-29-929764916.pt"
 
 train :: IO ()
 train = do
@@ -49,7 +49,8 @@ train = do
           trainSplit      = 0.8
           lower           = 0
           upper           = 1
-          numSamples      = 500000
+          numSamples      = maxBound :: Int -- take everything!
+          --numSamples      = 500000
           --numSamples      = 200000
           batchSize       = 2000
 
