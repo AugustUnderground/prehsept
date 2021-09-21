@@ -32,7 +32,6 @@ tags
 better-cache/
 stack*.yaml.lock
 
-*.svg
 *.png
 
 *.pt
