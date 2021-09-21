@@ -106,6 +106,11 @@ net Net {..} = linear l9 . relu
              . linear l1 . relu
              . linear l0 . relu
 
+--linearXavier :: [Int] -> Linear
+--linearXavier [i,o] = Linear { weight = xavierUniform' [o,i] >>= makeIndependent
+--                            , bias = xavierUniform' [o,1] >>= makeIndependent <$> reshape [1]
+--                            }
+
 -- | Convert model to Double on GPU
 toDoubleGPU :: forall a. HasTypes a Tensor => a -> a
 toDoubleGPU = over (types @ Tensor @a) (toDevice computingDevice . toType Double)
