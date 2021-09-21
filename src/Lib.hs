@@ -156,22 +156,23 @@ trainNet !trainData !validData = do
     -- Initialize Adam Optimizer
     let initOptim = mkAdam 0 0.9 0.999 (flattenParameters initModel)
 
-    (model', optim') <- foldLoop (initModel, initOptim) numEpochs $ \(m,o) e -> do
-        -- Training
-        (m', o', l') <- runContT (streamFromMap opts trainSet)
-                        $ trainLoop m o learningRate . fst
+    (model', optim') <- foldLoop (initModel, initOptim) numEpochs $ 
+        \(m,o) e -> do
+            -- Training
+            (m', o', l') <- runContT (streamFromMap opts trainSet)
+                            $ trainLoop m o learningRate . fst
 
-        putStrLn $ show e ++  " | Training Loss (MSE): " 
-                ++ show (l' / fromIntegral numTrainBatches)
+            putStrLn $ show e ++  " | Training Loss (MSE): " 
+                    ++ show (l' / fromIntegral numTrainBatches)
 
-        -- Validation
-        --(m'', l'') <- runContT (streamFromMap opts trainSet)
-        --                $ validLoop m . fst
+            -- Validation
+            --(m'', l'') <- runContT (streamFromMap opts trainSet)
+            --                $ validLoop m . fst
 
-        --putStrLn $ show e ++  " | Validation Loss (MAE): " 
-        --        ++ show (l'' / fromIntegral numValidBatches)
+            --putStrLn $ show e ++  " | Validation Loss (MAE): " 
+            --        ++ show (l'' / fromIntegral numValidBatches)
 
-        return (m', o')
+            return (m', o')
     
     -- Save final model
     save (toDependent <$> flattenParameters model') ptFile
@@ -179,16 +180,17 @@ trainNet !trainData !validData = do
 
     return model'
 
-    where opts            = datasetOpts 25
+    where opts            = datasetOpts 15
           paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
           paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
           numX            = length paramsX
           numY            = length paramsY
-          numEpochs       = 123
-          --numEpochs       = 666
-          learningRate    = asTensor' (1.0e-3 :: Double) ( withDType Double 
-                                                         . withDevice computingDevice 
-                                                         $ defaultOpts )
+          --numEpochs       = 123
+          numEpochs       = 666
+          learningRate    = asTensor' (1.0e-3 :: Double) 
+                                      ( withDType Double 
+                                      . withDevice computingDevice 
+                                      $ defaultOpts )
           numTrainBatches = length (inputs trainData)
           trainSet        = OP { opdev = computingDevice
                                , numBatches = numTrainBatches

@@ -6,8 +6,8 @@ import Data.Time.Clock
 import Lib
 
 main :: IO ()
--- main = train
-main = eval "../models/prehsept/xh035-nmos-2021-09-2016-37-46-687795907.pt"
+--main = train
+main = eval "../models/prehsept/xh035-nmos-2021-09-2105-56-44-204791151.pt"
 
 train :: IO ()
 train = do
