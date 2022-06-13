@@ -1,6 +1,7 @@
 # prehsept
 
-[PRECEPT](https://github.com/electronics-and-drives/precept) but in haskell.
+Modeling the behaviour of primitive devices around the operating point in
+haskell.
 
 ## Setup
 
@@ -30,23 +31,29 @@ then run it
 $ stack run
 ```
 
-and observe these sweet succulent plots
+### CLI
 
-![](./doc/visualization.svg)
+The executable part supports the following arguments:
 
-... I know it sucks ...
+```bash
+Primitive Device Modeling Around the Operating Point
 
-## TODO
+Usage: prehsept-exe [-k|--pdk PDK] [-d|--dev DEV] (-p|--dir DIR) [-n|--num NUM]
+                    [-s|--size SIZE]
+  PREHSEPT
 
-- [ ] Fix validation loop
-- [ ] Add argument parser for training data path etc.
-- [ ] Add Tests.
-- [ ] Weighted data sampling
-- [ ] Better weight init (xavier maybe?)
-- [X] Try data loaders. 
-- [X] Move training loop to Lib.
-- [X] Plots
-- [ ] Serving
+Available options:
+  -k,--pdk PDK             PDK from which the data was generated (default: xh035)
+  -d,--dev DEV             Device Type: nmos | pmos (default: nmos)
+  -p,--dir DIR             Path to lookup-table as tensor
+  -n,--num NUM             Number of Epochs (default: 25)
+  -s,--size SIZE           Batch Size (default: 25)
+  -h,--help                Show this help text
+```
+
+## Example Notebooks
+
+soon.
 
 ## License
 
