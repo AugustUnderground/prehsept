@@ -1,9 +1,9 @@
 name:                prehsept
-version:             0.1.0.0
+version:             0.6.6.6
 github:              "augustunderground/prehsept"
 license:             BSD3
 author:              "Yannick Uhlmann"
-maintainer:          "augustunderground@protonmail.com"
+maintainer:          "augustunderground@pm.me"
 copyright:           "Yannick Uhlmann"
 
 extra-source-files:
@@ -20,23 +20,13 @@ dependencies:
 - base >= 4.7 && < 5
 - hasktorch
 - libtorch-ffi
-- mtl
-- containers
-- vector
-- hnetcdf
-- deepseq
-- pipes
-- text
-- split
-- random
-- random-shuffle
-- MonadRandom
-- hvega
+- bytestring
+- binary
 - time
-  #- plotlyhs
-  #- lucid
-  #- microlens
-  #- time
+- directory
+- optparse-applicative
+- terminal-progress-bar
+- text
 
 library:
   source-dirs: src

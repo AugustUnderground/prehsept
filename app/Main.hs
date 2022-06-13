@@ -1,92 +1,47 @@
+{-# OPTIONS_GHC -Wall #-}
+
+-- | PREHSEPT
 module Main where
 
-import qualified Data.Map as M
-import Data.Time.Clock
-
 import Lib
+import Run
+import Options.Applicative
 
 main :: IO ()
---main = train
-main = eval "../models/prehsept/xh035-nmos-2021-09-2115-32-29-929764916.pt"
+main =  execParser opts >>= run
+  where
+    desc = "PREHSEPT"
+    opts = info (args <**> helper) 
+                (fullDesc <> progDesc desc 
+                          <> header "Primitive Device Modeling Around the Operating Point")
 
-train :: IO ()
-train = do
-    --- Get current timestamp for file name
-    ts <- concatMap (\p -> [if c == ':' || c == '.' then '-' else c | c <- p]) 
-        . init . words . show <$> getCurrentTime
-
-    --- Loading Data from NetCDF
-    rawData     <- getDataFromNC ncFileName (paramsX ++ paramsY ++ ["W"])
-    sampledData <- M.map (take numSamples) <$> shuffleData rawData
-
-    ------ TRAINING
-    --- Process training data
-    let (trainData, validData, predict) 
-            = preprocessData lower upper maskX maskY 
-                             paramsX paramsY trainSplit 
-                             sampledData batchSize
-    
-    --- Train with dataset/stream
-    model <- trainNet trainData validData
-
-    --- Save trained model
-    saveNet model (modelPrefix ++ ts ++ ".pt")
-
-    putStrLn "``'-.,_,.-'``'-.,_,.='``'-., DONE ,.-'``'-.,_,.='``'-.,_,.='``"
-
-    where technology      = "xh035"
-          deviceType      = "nmos"
-          ncFileName      = "/home/uhlmanny/Workspace/data/" 
-                          ++ technology ++ "-" ++ deviceType  ++ ".nc"
-          modelPrefix     = "../models/prehsept/" ++ technology 
-                          ++ "-" ++ deviceType ++ "-"
-          paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
-          paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
-          numX            = length paramsX
-          numY            = length paramsY
-          maskX           = [0,1,0,0]
-          maskY           = [1,0,1,0]
-          trainSplit      = 0.8
-          lower           = 0
-          upper           = 1
-          numSamples      = maxBound :: Int -- take everything!
-          --numSamples      = 500000
-          --numSamples      = 200000
-          batchSize       = 2000
-
-eval :: String -> IO ()
-eval ptFile = do
-    --- Loading Data from NetCDF
-    rawData     <- getDataFromNC ncFileName (paramsX ++ paramsY ++ ["W"])
-
-    let (trainData, validData, predict) 
-            = preprocessData lower upper maskX maskY 
-                             paramsX paramsY trainSplit 
-                             rawData batchSize
-
-    --- Load trained model
-    model' <- loadNet ptFile numX numY
-
-    --- Extract the prediction method
-    let predict' = predict model'
-
-    --- Make predictions and plot vs. ground truth
-    plotPredictionVsTruth rawData predict' "gmoverid" "idoverw"
-
-    ------ DONE
-    putStrLn "``'-.,_,.-'``'-.,_,.='``'-., DONE ,.-'``'-.,_,.='``'-.,_,.='``"
- 
-    where technology      = "xh035"
-          deviceType      = "nmos"
-          ncFileName      = "/home/uhlmanny/Workspace/data/" 
-                          ++ technology ++ "-" ++ deviceType  ++ ".nc"
-          paramsX         = ["gmoverid", "fug", "Vds", "Vbs"]
-          paramsY         = ["idoverw", "L", "gdsoverw", "Vgs"]
-          numX            = length paramsX
-          numY            = length paramsY
-          maskX           = [0,1,0,0]
-          maskY           = [1,0,1,0]
-          trainSplit      = 0.8
-          lower           = 0
-          upper           = 1
-          batchSize       = 2000
+args :: Parser Args
+args = Args <$> option auto ( long "pdk" 
+                           <> short 'k'
+                           <> metavar "PDK" 
+                           <> showDefault 
+                           <> value XH035
+                           <> help "PDK from which the data was generated" )
+            <*> option auto ( long "dev" 
+                           <> short 'd'
+                           <> metavar "DEV" 
+                           <> showDefault 
+                           <> value NMOS
+                           <> help "Device Type: nmos | pmos" )
+            <*> strOption ( long "dir" 
+                         <> short 'p'
+                         <> metavar "DIR" 
+                         <> showDefault 
+                         <> help "Path to lookup-table as tensor" )
+            <*> option auto ( long "num" 
+                           <> short 'n'
+                           <> metavar "NUM" 
+                           <> showDefault 
+                           <> value 25
+                           <> help "Number of Epochs" )
+            <*> option auto ( long "size" 
+                           <> short 's'
+                           <> metavar "SIZE" 
+                           <> showDefault 
+                           <> value 25
+                           <> help "Batch Size" )
