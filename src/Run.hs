@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Module for running training
 module Run where
@@ -27,56 +28,56 @@ satMask PMOS df = T.logicalAnd (T.abs (df ?? "Vgs") `T.gt` T.abs (df ?? "vth"))
                         (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
                 $ (0.0 `T.lt` (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
 
+-- | Process Data
+process :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
+process mi ma tf = scale mi ma . trafo tf
+
 ------------------------------------------------------------------------------
 -- Training
 ------------------------------------------------------------------------------
 
 -- | Run one Update Step
-trainStep :: (OpNet -> T.Tensor -> T.Tensor) -> T.Tensor -> T.Tensor 
+trainStep :: T.Tensor -> T.Tensor 
           -> OpNet -> T.Adam -> IO (OpNet, T.Adam)
-trainStep predict trueX trueY net opt = T.runStep net opt loss 0.001
+trainStep trueX trueY net opt = do
+    -- putStrLn $ "\tLoss: " ++ show loss
+    T.runStep net opt loss 0.001
   where
-    predY = predict net trueX
+    predY = forward net trueX
     loss  = T.mseLoss trueY predY
 
 -- | Run through all Batches performing an update for each
-trainingEpoch :: ProgressBar s -> (OpNet -> T.Tensor -> T.Tensor) -> [T.Tensor] 
-              -> [T.Tensor] -> OpNet -> T.Adam -> IO (OpNet, T.Adam)
-trainingEpoch _ _         _      []   net opt = pure (net, opt)
-trainingEpoch _ _         []     _    net opt = pure (net, opt)
-trainingEpoch bar predict (x:xs) (y:ys) net opt = do
+trainingEpoch :: ProgressBar s -> [T.Tensor] -> [T.Tensor] -> OpNet -> T.Adam 
+              -> IO (OpNet, T.Adam)
+trainingEpoch _         _      []   net opt = pure (net, opt)
+trainingEpoch _         []     _    net opt = pure (net, opt)
+trainingEpoch bar (x:xs) (y:ys) net opt = do
         incProgress bar 1
-        trainStep predict x' y' net opt >>= trainingEpoch' 
+        trainStep x y net opt >>= trainingEpoch' 
   where
-    x' = T.toDevice compDev x
-    y' = T.toDevice compDev y
-    trainingEpoch' = uncurry $ trainingEpoch bar predict xs ys
+    trainingEpoch' = uncurry $ trainingEpoch bar xs ys
 
 ------------------------------------------------------------------------------
 -- Validation
 ------------------------------------------------------------------------------
 
 -- | Run one Update Step
-validStep :: (OpNet -> T.Tensor -> T.Tensor) -> T.Tensor -> T.Tensor 
-          -> OpNet -> IO T.Tensor
-validStep predict trueX trueY net = T.detach loss
+validStep :: T.Tensor -> T.Tensor -> OpNet -> IO T.Tensor
+validStep trueX trueY net = T.detach loss
   where
-    predY = predict net trueX
+    predY = forward net trueX
     loss  = T.l1Loss T.ReduceMean trueY predY
 
 -- | Run through all Batches performing an update for each
-validationEpoch :: ProgressBar s -> (OpNet -> T.Tensor -> T.Tensor) 
-                -> [T.Tensor] -> [T.Tensor] -> OpNet -> [T.Tensor] 
-                -> IO T.Tensor
-validationEpoch _ _         _      [] _ losses = pure $ T.cat (T.Dim 0) losses
-validationEpoch _ _         []     _  _ losses = pure $ T.cat (T.Dim 0) losses
-validationEpoch bar predict (x:xs) (y:ys) net losses = do
+validationEpoch :: ProgressBar s -> [T.Tensor] -> [T.Tensor] -> OpNet 
+                -> [T.Tensor] -> IO T.Tensor
+validationEpoch _     _      []   _   losses = pure $ T.cat (T.Dim 0) losses
+validationEpoch _     []     _    _   losses = pure $ T.cat (T.Dim 0) losses
+validationEpoch bar (x:xs) (y:ys) net losses = do
         incProgress bar 1
-        validStep predict x' y' net >>= 
-                validationEpoch bar predict xs ys net . (:losses) 
+        validStep x y net >>= 
+                validationEpoch bar xs ys net . (:losses) 
   where
-    x' = T.toDevice compDev x
-    y' = T.toDevice compDev y
 
 ------------------------------------------------------------------------------
 -- Running
@@ -84,22 +85,21 @@ validationEpoch bar predict (x:xs) (y:ys) net losses = do
 
 -- | Run Training and Validation for a given number of Epochs
 runEpochs :: FilePath -> Int -> [T.Tensor] -> [T.Tensor] -> [T.Tensor] 
-          -> [T.Tensor] -> (OpNet -> T.Tensor -> T.Tensor) -> OpNet -> T.Adam
-          -> IO (OpNet, T.Adam)
-runEpochs path 0     _       _       _       _       _       net opt = do
+          -> [T.Tensor] -> OpNet -> T.Adam -> IO (OpNet, T.Adam)
+runEpochs path 0     _       _       _       _       net opt = do
     saveCheckPoint path net opt
     pure (net, opt)
-runEpochs path epoch trainXs validXs trainYs validYs predict net opt = do
+runEpochs path epoch trainXs validXs trainYs validYs net opt = do
 
-    tBar <- newProgressBar trainStyle 10 (Progress 0 (length trainXs) ())
-    (net', opt') <- trainingEpoch tBar predict trainXs trainYs net opt
+    tBar         <- newProgressBar trainStyle 10 (Progress 0 (length trainXs) ())
+    (net', opt') <- trainingEpoch tBar trainXs trainYs net opt
 
-    vBar <- newProgressBar validStyle 10 (Progress 0 (length validXs) ())
-    _            <- validationEpoch vBar predict validXs validYs net' []
+    vBar         <- newProgressBar validStyle 10 (Progress 0 (length validXs) ())
+    _            <- validationEpoch vBar validXs validYs net' []
 
     saveCheckPoint path net' opt'
 
-    runEpochs path epoch' trainXs validXs trainYs validYs predict net' opt'
+    runEpochs path epoch' trainXs validXs trainYs validYs net' opt'
   where
     epoch' = epoch - 1
 
@@ -107,6 +107,8 @@ runEpochs path epoch trainXs validXs trainYs validYs predict net opt = do
 run :: Args 
       -> IO ()
 run Args{..} = do
+    putStrLn $ "Training " ++ show dev ++ " Model in " ++ show pdk ++ "."
+
     path <- createModelDir pdk' dev'
     df'  <- DF.fromFile dir
 
@@ -125,15 +127,15 @@ run Args{..} = do
 
     vals <- T.detach vals' >>= T.clone
 
-    let df''      = dropNan $ DataFrame cols vals
-        minX    = fst . T.minDim (T.Dim 0) T.RemoveDim . values 
-                . DF.lookup paramsX $ df''
-        maxX    = fst . T.maxDim (T.Dim 0) T.RemoveDim . values 
-                . DF.lookup paramsX $ df''
-        minY    = fst . T.minDim (T.Dim 0) T.RemoveDim . values 
-                . DF.lookup paramsY $ df''
-        maxY    = fst . T.maxDim (T.Dim 0) T.RemoveDim . values 
-                . DF.lookup paramsY $ df''
+    let df''    = DataFrame cols vals
+        minX    = fst . T.minDim (T.Dim 0) T.RemoveDim 
+                . values . DF.lookup paramsX $ df''
+        maxX    = fst . T.maxDim (T.Dim 0) T.RemoveDim 
+                . values . DF.lookup paramsX $ df''
+        minY    = fst . T.minDim (T.Dim 0) T.RemoveDim 
+                . values . DF.lookup paramsY $ df''
+        maxY    = fst . T.maxDim (T.Dim 0) T.RemoveDim 
+                . values . DF.lookup paramsY $ df''
 
     let sat   = satMask dev df''
         sat'  = T.logicalNot sat
@@ -141,27 +143,36 @@ run Args{..} = do
         dfSat = rowFilter sat df''
 
     dfSat' <- DF.sampleIO nSat' False $ rowFilter sat' df''
-    df     <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
+    dfS    <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
 
-    net <- T.sample $ OpNetSpec (length paramsX) (length paramsX)
+    let !df = DF.dropNan 
+            $ DF.union (process minX maxX maskX <$> DF.lookup paramsX dfS) 
+                       (process minY maxY maskY <$> DF.lookup paramsY dfS)
+
+    net <- T.toDevice gpu <$> T.sample (OpNetSpec numX numY)
+
     let opt = T.mkAdam 0 0.9 0.999 $ NN.flattenParameters net
     
-    let predict = predictor minX maxX minY maxY maskX maskY
+    let (!trainX, !validX, !trainY, !validY) = 
+                trainTestSplit paramsX paramsY testSplit df
 
-    let (trainX, validX, trainY, validY) = trainTestSplit paramsX paramsY 
-                                                          testSplit df
-        batchesX  = T.split size (T.Dim 0) trainX
-        batchesY  = T.split size (T.Dim 0) trainY
-        batchesX' = T.split size (T.Dim 0) validX
-        batchesY' = T.split size (T.Dim 0) validY
-        traceData = T.cat (T.Dim 0) [trainX, validX]
-        tracePath = path ++ "trace.pt"
+    let !batchesX  = T.split size (T.Dim 0) . T.toDevice gpu $ trainX
+        !batchesY  = T.split size (T.Dim 0) . T.toDevice gpu $ trainY
+        !batchesX' = T.split size (T.Dim 0) . T.toDevice gpu $ validX
+        !batchesY' = T.split size (T.Dim 0) . T.toDevice gpu $ validY
 
-    (net', opt') <- runEpochs path num batchesX batchesX' batchesY batchesY' 
-                              predict net opt
+    (net', opt') <- runEpochs path num batchesX batchesX' 
+                                       batchesY batchesY' 
+                              net opt
 
     saveCheckPoint path net' opt'
-    traceModel dev pdk traceData (predict net') >>= saveModel tracePath
+
+    net'' <- T.toDevice cpu <$> noGrad net'
+    let predict   = predictor minX maxX minY maxY maskX maskY net''
+        traceData = values $ DF.lookup paramsX dfS
+        tracePath = path ++ "/trace.pt"
+
+    traceModel dev pdk traceData predict >>= saveModel tracePath
 
     pure ()
   where
@@ -169,8 +180,10 @@ run Args{..} = do
     dev'      = show dev
     testSplit = 0.8
     cols      = [ "gmoverid", "idoverw", "gdsoverw", "fug"
-                , "Vds", "Vgs", "Vbs", "vth", "id" ]
+                , "Vds", "Vgs", "Vbs", "vth", "id", "W", "L" ]
     paramsX   = ["gmoverid", "fug", "Vds", "Vbs"]
     paramsY   = ["idoverw", "L", "gdsoverw", "Vgs"]
+    numX      = length paramsX
+    numY      = length paramsY
     maskX     = boolMask' ["fug"] paramsX
     maskY     = boolMask' ["idoverw", "gdsoverw"] paramsY

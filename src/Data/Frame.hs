@@ -128,12 +128,12 @@ concat = foldl1 join
 -- | Take n Random samples from Data Frame
 sampleIO :: Int -> Bool -> DataFrame T.Tensor -> IO (DataFrame T.Tensor)
 sampleIO num replace df = do
-    idx' <- T.multinomialIO idx num rep
+    idx' <- T.toDType T.Int64 <$> T.multinomialIO idx num rep
     pure $ rowSelect idx' df
   where 
     len = nRows df
     rep = replace && (len <= num)
-    idx = T.arange 0 len 1 $ T.withDType T.Int64 T.defaultOpts
+    idx = T.arange' 0 len 1
 
 -- | Shuffle all rows
 shuffleIO :: DataFrame T.Tensor -> IO (DataFrame T.Tensor)
@@ -141,18 +141,15 @@ shuffleIO df = sampleIO (nRows df) False df
 
 trainTestSplit :: [String] -> [String] -> Float -> DataFrame T.Tensor
                -> (T.Tensor, T.Tensor, T.Tensor, T.Tensor)
-trainTestSplit paramsX paramsY testSize df = (trainX, validX, trainY, validY)
+trainTestSplit paramsX paramsY trainSize df = (trainX, validX, trainY, validY)
   where
-    trainLen = round $ testSize * realToFrac (nRows df)
-    validLen = round $ (1.0 - testSize) * realToFrac (nRows df)
-    trainIdx = T.arange 0        trainLen 1 $ T.withDType T.Int64 T.defaultOpts
-    validIdx = T.arange trainLen validLen 1 $ T.withDType T.Int64 T.defaultOpts
+    trainLen = round $     trainSize     * realToFrac (nRows df)
+    validLen = round $ (1.0 - trainSize) * realToFrac (nRows df)
+    trainIdx = T.arange 0               trainLen       1 
+             $ T.withDType T.Int64 T.defaultOpts
+    validIdx = T.arange trainLen (trainLen + validLen) 1 
+             $ T.withDType T.Int64 T.defaultOpts
     trainX   = values . rowSelect trainIdx $ lookup paramsX df
     validX   = values . rowSelect validIdx $ lookup paramsX df
     trainY   = values . rowSelect trainIdx $ lookup paramsY df
     validY   = values . rowSelect validIdx $ lookup paramsY df
-
--- df <- fromFile "../primitive-device-characterization/pt/xh035-nmos.pt"
--- df <- fromFile "./data/xh035-nmos.pt"
-
--- T.gt (df ?? "temp") 0.5

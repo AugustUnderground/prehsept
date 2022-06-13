@@ -149,13 +149,13 @@ data Args = Args { pdk  :: PDK      -- ^ PDK
 
 -- | Progress Bar Style for Training
 trainStyle :: Style s
-trainStyle = Style { styleOpen          = "["
-                   , styleClose         = "]"
-                   , styleDone          = '|'
-                   , styleCurrent       = '>'
-                   , styleTodo          = '-'
+trainStyle = Style { styleOpen          = "╢"
+                   , styleClose         = "╟"
+                   , styleDone          = '█'
+                   , styleCurrent       = '░'
+                   , styleTodo          = '░'
                    , stylePrefix        = msg "Training"
-                   , stylePostfix       = msg " MSE"
+                   , stylePostfix       = percentage
                    , styleWidth         = ConstantWidth 40
                    , styleEscapeOpen    = const empty
                    , styleEscapeClose   = const empty
@@ -169,13 +169,13 @@ trainStyle = Style { styleOpen          = "["
 
 -- | Progress Bar Style for Validation
 validStyle :: Style s
-validStyle = Style { styleOpen          = "["
-                   , styleClose         = "]"
-                   , styleDone          = '|'
-                   , styleCurrent       = '>'
-                   , styleTodo          = '-'
+validStyle = Style { styleOpen          = "╢"
+                   , styleClose         = "╟"
+                   , styleDone          = '█'
+                   , styleCurrent       = '░'
+                   , styleTodo          = '░'
                    , stylePrefix        = msg "Validating"
-                   , stylePostfix       = msg " MAE"
+                   , stylePostfix       = percentage
                    , styleWidth         = ConstantWidth 40
                    , styleEscapeOpen    = const empty
                    , styleEscapeClose   = const empty

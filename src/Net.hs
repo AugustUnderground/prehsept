@@ -16,18 +16,23 @@ module Net where
 import           Lib
 import           GHC.Generics
 import qualified Torch                     as T
+import qualified Torch.NN                  as NN
 import qualified Torch.Functional.Internal as T (where')
 
 ------------------------------------------------------------------------------
--- UTILITIES
+-- Utilities
 ------------------------------------------------------------------------------
 
--- | Main Computing Device
-compDev :: T.Device
-compDev = T.Device T.CUDA 1
+-- | GPU
+gpu :: T.Device
+gpu = T.Device T.CUDA 1
+
+-- | CPU
+cpu :: T.Device
+cpu = T.Device T.CPU 0
 
 ------------------------------------------------------------------------------
--- NEURAL NETWORK
+-- Neural Network
 ------------------------------------------------------------------------------
 
 -- | Neural Network Specification
@@ -53,7 +58,7 @@ instance T.Randomizable OpNetSpec OpNet where
                                  <*> T.sample (T.LinearSpec 512  128)
                                  <*> T.sample (T.LinearSpec 128  64)
                                  <*> T.sample (T.LinearSpec 64   32)
-                                 <*> T.sample (T.LinearSpec 32   numX)
+                                 <*> T.sample (T.LinearSpec 32   numY)
 
 -- | Neural Network Forward Pass
 forward :: OpNet -> T.Tensor -> T.Tensor
@@ -66,7 +71,7 @@ forward OpNet{..} = T.linear fc6 . T.relu
                   . T.linear fc0
 
 ------------------------------------------------------------------------------
--- DATA PROCESSING
+-- Data Processing
 ------------------------------------------------------------------------------
 
 -- | Scale data to [0;1]
@@ -86,8 +91,15 @@ trafo' :: T.Tensor -> T.Tensor -> T.Tensor
 trafo' yMask y = T.where' yMask (T.pow (10.0 :: Float) y) y
 
 ------------------------------------------------------------------------------
--- TORCH SCRIPT
+-- Serialization
 ------------------------------------------------------------------------------
+
+-- | Remove Gradient for tracing / scripting
+noGrad :: (NN.Parameterized f) => f -> IO f
+noGrad net = do
+    params  <- mapM (T.detach . T.toDependent) $ NN.flattenParameters net
+    params' <- mapM (`T.makeIndependentWithRequiresGrad` False) params
+    pure $ NN.replaceParameters net params'
 
 -- | Wrapper for Network predictions including scaling and transformation
 predictor :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor 
@@ -105,9 +117,19 @@ predictor xMin xMax yMin yMax xMask yMask net = trafo' yMask     -- Reverse Tran
 -- | Save Model and Optimizer Checkpoint
 saveCheckPoint :: FilePath -> OpNet -> T.Adam -> IO ()
 saveCheckPoint path net opt = do
-    T.saveParams net  (path ++ "model.pt")
-    T.save (T.m1 opt) (path ++ "M1.pt")
-    T.save (T.m2 opt) (path ++ "M2.pt")
+    T.saveParams net  (path ++ "/model.pt")
+    T.save (T.m1 opt) (path ++ "/M1.pt")
+    T.save (T.m2 opt) (path ++ "/M2.pt")
+
+-- | Load a Saved Model and Optimizer CheckPoint
+loadCheckPoint :: FilePath -> Int -> Int -> Int -> IO (OpNet, T.Adam)
+loadCheckPoint path numX numY iter = do
+    net <- T.sample (OpNetSpec numX numY) 
+                >>= (`T.loadParams` (path ++ "/model.pt"))
+    m1' <- T.load (path ++ "/M1.pt")
+    m2' <- T.load (path ++ "/M2.pt")
+    let opt = T.Adam 0.9 0.999 m1' m2' iter
+    pure (net, opt)
 
 -- | Trace and Return a Script Module
 traceModel :: Device -> PDK -> T.Tensor -> (T.Tensor -> T.Tensor) 
@@ -115,8 +137,12 @@ traceModel :: Device -> PDK -> T.Tensor -> (T.Tensor -> T.Tensor)
 traceModel dev pdk inputs predict = 
         T.trace (show pdk) (show dev) fun [inputs] >>= T.toScriptModule
   where
-    fun = pure . map predict
+    fun = mapM (T.detach . predict)
 
 -- | Save a Traced ScriptModule
 saveModel :: FilePath -> T.ScriptModule -> IO ()
 saveModel path model = T.saveScript model path
+
+-- | Load a Traced ScriptModule
+loadModel :: FilePath -> IO T.ScriptModule
+loadModel = T.loadScript T.WithoutRequiredGrad

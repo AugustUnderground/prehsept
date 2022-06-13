@@ -43,5 +43,5 @@ args = Args <$> option auto ( long "pdk"
                            <> short 's'
                            <> metavar "SIZE" 
                            <> showDefault 
-                           <> value 25
+                           <> value 5000
                            <> help "Batch Size" )
