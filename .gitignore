@@ -40,3 +40,4 @@ stack*.yaml.lock
 
 models
 data
+notebooks/.ipynb_checkpoints
