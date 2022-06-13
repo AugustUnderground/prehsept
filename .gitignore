@@ -32,12 +32,6 @@ tags
 better-cache/
 stack*.yaml.lock
 
-*.png
-
-*.pt
-*.ckpt
-*.html
-
 models
 data
 notebooks/.ipynb_checkpoints
