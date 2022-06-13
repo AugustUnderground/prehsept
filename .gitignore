@@ -39,3 +39,4 @@ stack*.yaml.lock
 *.html
 
 models
+data
