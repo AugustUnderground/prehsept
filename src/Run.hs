@@ -9,6 +9,7 @@ module Run where
 import           System.ProgressBar
 import           Lib
 import           Net
+import           HyperParameters
 import           Data.Frame as DF
 import qualified Torch      as T
 import qualified Torch.NN   as NN
@@ -40,7 +41,7 @@ process mi ma tf = scale mi ma . trafo tf
 trainStep :: T.Tensor -> T.Tensor 
           -> OpNet -> T.Adam -> IO (OpNet, T.Adam, T.Tensor)
 trainStep trueX trueY net opt = do
-    (net', opt') <- T.runStep net opt loss 0.001
+    (net', opt') <- T.runStep net opt loss α
     pure (net', opt', loss)
   where
     predY = forward net trueX
@@ -160,7 +161,7 @@ run Args{..} = do
 
     net <- T.toDevice gpu <$> T.sample (OpNetSpec numX numY)
 
-    let opt = T.mkAdam 0 0.9 0.999 $ NN.flattenParameters net
+    let opt = T.mkAdam 0 β1 β2 $ NN.flattenParameters net
     
     let (!trainX, !validX, !trainY, !validY) = 
                 trainTestSplit paramsX paramsY testSplit df
