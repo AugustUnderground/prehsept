@@ -181,7 +181,7 @@ validStyle epoch = Style { styleOpen          = "╢"
                          , styleTodo          = '░'
                          , stylePrefix        = msg . pack $ "Validation Epoch " ++ show epoch
                          , stylePostfix       = percentage
-                         , styleWidth         = ConstantWidth 40
+                         , styleWidth         = ConstantWidth 60
                          , styleEscapeOpen    = const empty
                          , styleEscapeClose   = const empty
                          , styleEscapeDone    = const empty
