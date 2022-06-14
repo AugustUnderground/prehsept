@@ -135,9 +135,10 @@ loadCheckPoint path numX numY iter = do
 traceModel :: Device -> PDK -> T.Tensor -> (T.Tensor -> T.Tensor) 
            -> IO T.ScriptModule
 traceModel dev pdk inputs predict = 
-        T.trace (show pdk) (show dev) fun [inputs] >>= T.toScriptModule
+        T.trace name "forward" fun [inputs] >>= T.toScriptModule
   where
     fun = mapM (T.detach . predict)
+    name = show pdk ++ "_" ++ show dev
 
 -- | Save a Traced ScriptModule
 saveInferenceModel :: FilePath -> T.ScriptModule -> IO ()
