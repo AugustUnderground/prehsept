@@ -5,13 +5,14 @@
 -- | Helper and Utility Functions
 module Lib where
 
-import           System.Directory
-import           System.ProgressBar
 import           Data.Maybe
 import           Data.List
 import           Data.Text.Internal.Lazy      (empty)
+import           Data.Text.Lazy               (pack)
 import           Data.Time.Clock              (getCurrentTime)
 import           Data.Time.Format             (formatTime, defaultTimeLocale)
+import           System.Directory
+import           System.ProgressBar
 import qualified Torch                   as T
 
 ------------------------------------------------------------------------------
@@ -152,41 +153,41 @@ data Args = Args { pdk  :: PDK      -- ^ PDK
 ------------------------------------------------------------------------------
 
 -- | Progress Bar Style for Training
-trainStyle :: Style s
-trainStyle = Style { styleOpen          = "╢"
-                   , styleClose         = "╟"
-                   , styleDone          = '█'
-                   , styleCurrent       = '░'
-                   , styleTodo          = '░'
-                   , stylePrefix        = msg "Training"
-                   , stylePostfix       = percentage
-                   , styleWidth         = ConstantWidth 40
-                   , styleEscapeOpen    = const empty
-                   , styleEscapeClose   = const empty
-                   , styleEscapeDone    = const empty
-                   , styleEscapeCurrent = const empty
-                   , styleEscapeTodo    = const empty
-                   , styleEscapePrefix  = const empty
-                   , styleEscapePostfix = const empty
-                   , styleOnComplete    = WriteNewline
-                   }
+trainStyle :: Int -> Style s
+trainStyle epoch = Style { styleOpen          = "╢"
+                         , styleClose         = "╟"
+                         , styleDone          = '█'
+                         , styleCurrent       = '░'
+                         , styleTodo          = '░'
+                         , stylePrefix        = msg . pack $ "Training Epoch " ++ show epoch
+                         , stylePostfix       = percentage
+                         , styleWidth         = ConstantWidth 60
+                         , styleEscapeOpen    = const empty
+                         , styleEscapeClose   = const empty
+                         , styleEscapeDone    = const empty
+                         , styleEscapeCurrent = const empty
+                         , styleEscapeTodo    = const empty
+                         , styleEscapePrefix  = const empty
+                         , styleEscapePostfix = const empty
+                         , styleOnComplete    = WriteNewline
+                         }
 
 -- | Progress Bar Style for Validation
-validStyle :: Style s
-validStyle = Style { styleOpen          = "╢"
-                   , styleClose         = "╟"
-                   , styleDone          = '█'
-                   , styleCurrent       = '░'
-                   , styleTodo          = '░'
-                   , stylePrefix        = msg "Validating"
-                   , stylePostfix       = percentage
-                   , styleWidth         = ConstantWidth 40
-                   , styleEscapeOpen    = const empty
-                   , styleEscapeClose   = const empty
-                   , styleEscapeDone    = const empty
-                   , styleEscapeCurrent = const empty
-                   , styleEscapeTodo    = const empty
-                   , styleEscapePrefix  = const empty
-                   , styleEscapePostfix = const empty
-                   , styleOnComplete    = WriteNewline
-                   }
+validStyle :: Int -> Style s
+validStyle epoch = Style { styleOpen          = "╢"
+                         , styleClose         = "╟"
+                         , styleDone          = '█'
+                         , styleCurrent       = '░'
+                         , styleTodo          = '░'
+                         , stylePrefix        = msg . pack $ "Validation Epoch " ++ show epoch
+                         , stylePostfix       = percentage
+                         , styleWidth         = ConstantWidth 40
+                         , styleEscapeOpen    = const empty
+                         , styleEscapeClose   = const empty
+                         , styleEscapeDone    = const empty
+                         , styleEscapeCurrent = const empty
+                         , styleEscapeTodo    = const empty
+                         , styleEscapePrefix  = const empty
+                         , styleEscapePostfix = const empty
+                         , styleOnComplete    = WriteNewline
+                         }

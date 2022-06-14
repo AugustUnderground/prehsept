@@ -97,12 +97,12 @@ runEpochs path 0     _       _       _       _       net opt = do
     pure (net, opt)
 runEpochs path epoch trainXs validXs trainYs validYs net opt = do
 
-    tBar <- newProgressBar trainStyle 10 (Progress 0 (length trainXs) ())
+    tBar <- newProgressBar (trainStyle epoch) 10 (Progress 0 (length trainXs) ())
     (net', opt', mse) <- trainingEpoch tBar trainXs trainYs [] net opt
 
     putStrLn $ "\tTraining Loss: " ++ show (T.mean mse)
 
-    vBar <- newProgressBar validStyle 10 (Progress 0 (length validXs) ())
+    vBar <- newProgressBar (validStyle epoch) 10 (Progress 0 (length validXs) ())
     mae  <- validationEpoch vBar validXs validYs net' []
     
     putStrLn $ "\tValidataion Loss: " ++ show (T.mean mae)
