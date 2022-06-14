@@ -8,7 +8,11 @@ module Data.Frame where
 import           Lib                            hiding (round)
 import           Prelude                        hiding (lookup, concat)
 import qualified Torch                     as T
-import qualified Torch.Functional.Internal as T (isinf)
+import qualified Torch.Functional.Internal as T        (isinf)
+
+------------------------------------------------------------------------------
+-- Base Data Type
+------------------------------------------------------------------------------
 
 -- | Data Frame
 data DataFrame a = DataFrame { columns :: [String] -- ^ Unique Column Identifier
@@ -18,6 +22,10 @@ data DataFrame a = DataFrame { columns :: [String] -- ^ Unique Column Identifier
 -- | Functor instance for Mapping over values
 instance Functor DataFrame where
   fmap f (DataFrame c v) = DataFrame c (f v)
+
+------------------------------------------------------------------------------
+-- API
+------------------------------------------------------------------------------
 
 -- | Number of Rows in DataFrame
 nRows :: DataFrame T.Tensor -> Int
