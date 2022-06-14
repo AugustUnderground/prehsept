@@ -140,9 +140,9 @@ traceModel dev pdk inputs predict =
     fun = mapM (T.detach . predict)
 
 -- | Save a Traced ScriptModule
-saveModel :: FilePath -> T.ScriptModule -> IO ()
-saveModel path model = T.saveScript model path
+saveInferenceModel :: FilePath -> T.ScriptModule -> IO ()
+saveInferenceModel path model = T.saveScript model path
 
 -- | Load a Traced ScriptModule
-loadModel :: FilePath -> IO T.ScriptModule
-loadModel = T.loadScript T.WithoutRequiredGrad
+loadInferenceModel :: FilePath -> IO T.ScriptModule
+loadInferenceModel = T.loadScript T.WithoutRequiredGrad

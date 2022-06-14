@@ -57,6 +57,10 @@ instance Read Device where
 fst3 :: (a,b,c) -> a
 fst3 (a,_,_) = a
 
+-- | Uncurry triple
+uncurry' :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry' f (a,b,c) = f a b c
+
 -- | Create a boolean mask from a subset of column names
 boolMask :: [String] -> [String] -> [Bool]
 boolMask sub = map (`elem` sub)

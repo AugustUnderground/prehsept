@@ -38,24 +38,28 @@ process mi ma tf = scale mi ma . trafo tf
 
 -- | Run one Update Step
 trainStep :: T.Tensor -> T.Tensor 
-          -> OpNet -> T.Adam -> IO (OpNet, T.Adam)
+          -> OpNet -> T.Adam -> IO (OpNet, T.Adam, T.Tensor)
 trainStep trueX trueY net opt = do
-    -- putStrLn $ "\tLoss: " ++ show loss
-    T.runStep net opt loss 0.001
+    (net', opt') <- T.runStep net opt loss 0.001
+    pure (net', opt', loss)
   where
     predY = forward net trueX
     loss  = T.mseLoss trueY predY
 
 -- | Run through all Batches performing an update for each
-trainingEpoch :: ProgressBar s -> [T.Tensor] -> [T.Tensor] -> OpNet -> T.Adam 
-              -> IO (OpNet, T.Adam)
-trainingEpoch _         _      []   net opt = pure (net, opt)
-trainingEpoch _         []     _    net opt = pure (net, opt)
-trainingEpoch bar (x:xs) (y:ys) net opt = do
+trainingEpoch :: ProgressBar s -> [T.Tensor]  -> [T.Tensor] -> [T.Tensor] 
+              -> OpNet -> T.Adam -> IO (OpNet, T.Adam, T.Tensor)
+trainingEpoch _     _      []   losses net opt = pure (net, opt, losses')
+  where
+    losses' = T.cat (T.Dim 0) . map (T.reshape [-1]) $ losses
+trainingEpoch _     []     _    losses net opt = pure (net, opt, losses')
+  where
+    losses' = T.cat (T.Dim 0) . map (T.reshape [-1]) $ losses
+trainingEpoch bar (x:xs) (y:ys) losses net opt = do
         incProgress bar 1
         trainStep x y net opt >>= trainingEpoch' 
   where
-    trainingEpoch' = uncurry $ trainingEpoch bar xs ys
+    trainingEpoch' = \ (n, o, l) -> trainingEpoch bar xs ys (l:losses) n o
 
 ------------------------------------------------------------------------------
 -- Validation
@@ -71,13 +75,14 @@ validStep trueX trueY net = T.detach loss
 -- | Run through all Batches performing an update for each
 validationEpoch :: ProgressBar s -> [T.Tensor] -> [T.Tensor] -> OpNet 
                 -> [T.Tensor] -> IO T.Tensor
-validationEpoch _     _      []   _   losses = pure $ T.cat (T.Dim 0) losses
-validationEpoch _     []     _    _   losses = pure $ T.cat (T.Dim 0) losses
+validationEpoch _     _      []   _   losses = pure . T.cat (T.Dim 0) 
+                                             . map (T.reshape [-1]) $ losses
+validationEpoch _     []     _    _   losses = pure . T.cat (T.Dim 0) 
+                                             . map (T.reshape [-1]) $ losses
 validationEpoch bar (x:xs) (y:ys) net losses = do
         incProgress bar 1
         validStep x y net >>= 
                 validationEpoch bar xs ys net . (:losses) 
-  where
 
 ------------------------------------------------------------------------------
 -- Running
@@ -91,11 +96,15 @@ runEpochs path 0     _       _       _       _       net opt = do
     pure (net, opt)
 runEpochs path epoch trainXs validXs trainYs validYs net opt = do
 
-    tBar         <- newProgressBar trainStyle 10 (Progress 0 (length trainXs) ())
-    (net', opt') <- trainingEpoch tBar trainXs trainYs net opt
+    tBar <- newProgressBar trainStyle 10 (Progress 0 (length trainXs) ())
+    (net', opt', mse) <- trainingEpoch tBar trainXs trainYs [] net opt
 
-    vBar         <- newProgressBar validStyle 10 (Progress 0 (length validXs) ())
-    _            <- validationEpoch vBar validXs validYs net' []
+    putStrLn $ "\tTraining Loss: " ++ show (T.mean mse)
+
+    vBar <- newProgressBar validStyle 10 (Progress 0 (length validXs) ())
+    mae  <- validationEpoch vBar validXs validYs net' []
+    
+    putStrLn $ "\tValidataion Loss: " ++ show (T.mean mae)
 
     saveCheckPoint path net' opt'
 
@@ -172,7 +181,7 @@ run Args{..} = do
         traceData = values $ DF.lookup paramsX dfS
         tracePath = path ++ "/trace.pt"
 
-    traceModel dev pdk traceData predict >>= saveModel tracePath
+    traceModel dev pdk traceData predict >>= saveInferenceModel tracePath
 
     pure ()
   where
