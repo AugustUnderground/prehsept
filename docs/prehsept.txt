@@ -37,6 +37,9 @@ PMOS :: Device
 -- | First of Triple
 fst3 :: (a, b, c) -> a
 
+-- | Uncurry triple
+uncurry' :: (a -> b -> c -> d) -> (a, b, c) -> d
+
 -- | Create a boolean mask from a subset of column names
 boolMask :: [String] -> [String] -> [Bool]
 
@@ -88,6 +91,12 @@ Args :: PDK -> Device -> FilePath -> Int -> Int -> Args
 
 -- | Batch Size
 [size] :: Args -> Int
+
+-- | Progress Bar Style for Training
+trainStyle :: Style s
+
+-- | Progress Bar Style for Validation
+validStyle :: Style s
 instance GHC.Classes.Eq Lib.PDK
 instance GHC.Classes.Eq Lib.Device
 instance GHC.Show.Show Lib.Args
@@ -174,8 +183,11 @@ instance GHC.Base.Functor Data.Frame.DataFrame
 -- | Neural Network Definition and Training
 module Net
 
--- | Main Computing Device
-compDev :: Device
+-- | GPU
+gpu :: Device
+
+-- | CPU
+cpu :: Device
 
 -- | Neural Network Specification
 data OpNetSpec
@@ -213,17 +225,26 @@ trafo :: Tensor -> Tensor -> Tensor
 -- | Inverse Transform Masked Data
 trafo' :: Tensor -> Tensor -> Tensor
 
+-- | Remove Gradient for tracing / scripting
+noGrad :: Parameterized f => f -> IO f
+
 -- | Wrapper for Network predictions including scaling and transformation
 predictor :: Tensor -> Tensor -> Tensor -> Tensor -> Tensor -> Tensor -> OpNet -> Tensor -> Tensor
 
 -- | Save Model and Optimizer Checkpoint
 saveCheckPoint :: FilePath -> OpNet -> Adam -> IO ()
 
+-- | Load a Saved Model and Optimizer CheckPoint
+loadCheckPoint :: FilePath -> Int -> Int -> Int -> IO (OpNet, Adam)
+
 -- | Trace and Return a Script Module
 traceModel :: Device -> PDK -> Tensor -> (Tensor -> Tensor) -> IO ScriptModule
 
 -- | Save a Traced ScriptModule
-saveModel :: FilePath -> ScriptModule -> IO ()
+saveInferenceModel :: FilePath -> ScriptModule -> IO ()
+
+-- | Load a Traced ScriptModule
+loadInferenceModel :: FilePath -> IO ScriptModule
 instance GHC.Classes.Eq Net.OpNetSpec
 instance GHC.Show.Show Net.OpNetSpec
 instance Torch.NN.Parameterized Net.OpNet
@@ -232,26 +253,42 @@ instance GHC.Generics.Generic Net.OpNet
 instance Torch.NN.Randomizable Net.OpNetSpec Net.OpNet
 
 
+-- | Hyper Parameters of OpNet
+module HyperParameters
+
+-- | First gradient momentum estimate, default = 0.9
+β1 :: Float
+
+-- | second gradient momentum estimate, default = 0.999
+β2 :: Float
+
+-- | Learning Rate
+α :: Tensor
+
+
 -- | Module for running training
 module Run
 
 -- | Filter Datapoints not in saturation
 satMask :: Device -> DataFrame Tensor -> Tensor
 
--- | Run one Update Step
-trainStep :: (OpNet -> Tensor -> Tensor) -> Tensor -> Tensor -> OpNet -> Adam -> IO (OpNet, Adam)
-
--- | Run through all Batches performing an update for each
-trainingEpoch :: (OpNet -> Tensor -> Tensor) -> [Tensor] -> [Tensor] -> OpNet -> Adam -> IO (OpNet, Adam)
+-- | Process Data
+process :: Tensor -> Tensor -> Tensor -> Tensor -> Tensor
 
 -- | Run one Update Step
-validStep :: (OpNet -> Tensor -> Tensor) -> Tensor -> Tensor -> OpNet -> IO Tensor
+trainStep :: Tensor -> Tensor -> OpNet -> Adam -> IO (OpNet, Adam, Tensor)
 
 -- | Run through all Batches performing an update for each
-validationEpoch :: (OpNet -> Tensor -> Tensor) -> [Tensor] -> [Tensor] -> OpNet -> [Tensor] -> IO Tensor
+trainingEpoch :: ProgressBar s -> [Tensor] -> [Tensor] -> [Tensor] -> OpNet -> Adam -> IO (OpNet, Adam, Tensor)
+
+-- | Run one Update Step
+validStep :: Tensor -> Tensor -> OpNet -> IO Tensor
+
+-- | Run through all Batches performing an update for each
+validationEpoch :: ProgressBar s -> [Tensor] -> [Tensor] -> OpNet -> [Tensor] -> IO Tensor
 
 -- | Run Training and Validation for a given number of Epochs
-runEpochs :: FilePath -> Int -> [Tensor] -> [Tensor] -> [Tensor] -> [Tensor] -> (OpNet -> Tensor -> Tensor) -> OpNet -> Adam -> IO (OpNet, Adam)
+runEpochs :: FilePath -> Int -> [Tensor] -> [Tensor] -> [Tensor] -> [Tensor] -> OpNet -> Adam -> IO (OpNet, Adam)
 
 -- | Initiate Training Run for given Args
 run :: Args -> IO ()
