@@ -41,6 +41,8 @@ library
     , bytestring
     , directory
     , hasktorch
+    , hvega
+    , ihaskell-hvega
     , libtorch-ffi
     , optparse-applicative
     , terminal-progress-bar
@@ -59,6 +61,8 @@ executable prehsept-exe
     , bytestring
     , directory
     , hasktorch
+    , hvega
+    , ihaskell-hvega
     , libtorch-ffi
     , optparse-applicative
     , prehsept
@@ -81,6 +85,8 @@ test-suite prehsept-test
     , bytestring
     , directory
     , hasktorch
+    , hvega
+    , ihaskell-hvega
     , libtorch-ffi
     , optparse-applicative
     , prehsept

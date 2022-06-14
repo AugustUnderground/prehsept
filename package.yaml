@@ -27,6 +27,8 @@ dependencies:
 - optparse-applicative
 - terminal-progress-bar
 - text
+- hvega
+- ihaskell-hvega
 
 library:
   source-dirs: src
