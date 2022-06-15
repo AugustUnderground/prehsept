@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Module for running training
 module Run where
@@ -29,9 +29,16 @@ satMask PMOS df = T.logicalAnd (T.abs (df ?? "Vgs") `T.gt` T.abs (df ?? "vth"))
                         (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
                 $ (0.0 `T.lt` (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
 
--- | Process Data
-process :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
-process mi ma tf = scale mi ma . trafo tf
+-- | Scale and transform a Tensor
+process' :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
+process' mi ma ms = scale mi ma . trafo ms
+
+-- | Scale and transform a DataFrame
+process :: T.Tensor -> T.Tensor -> T.Tensor -> DataFrame T.Tensor 
+        -> DataFrame T.Tensor
+process mi ma ms DataFrame{..} = DataFrame columns values'
+  where
+    values' = process' mi ma ms values
 
 ------------------------------------------------------------------------------
 -- Training
@@ -119,50 +126,49 @@ run :: Args
 run Args{..} = do
     putStrLn $ "Training " ++ show dev ++ " Model in " ++ show pdk ++ "."
 
-    path <- createModelDir pdk' dev'
-    df'  <- DF.fromFile dir
+    modelPath <- createModelDir pdk' dev'
+    dfRaw     <- DF.fromFile dir
 
-    let vals'   = T.cat (T.Dim 1) [ T.abs $  df' ?? "M0.m1:gmoverid"
-                                  , T.abs $ (df' ?? "M0.m1:id")  / (df' ?? "W")
-                                  , T.abs $ (df' ?? "M0.m1:gds") / (df' ?? "W")
-                                  , T.abs $  df' ?? "M0.m1:fug"
-                                  ,          df' ?? "M0.m1:vds"
-                                  ,          df' ?? "M0.m1:vgs"
-                                  ,          df' ?? "M0.m1:vbs"
-                                  ,          df' ?? "M0.m1:vth"
-                                  ,          df' ?? "M0.m1:id"
-                                  ,          df' ?? "W"
-                                  ,          df' ?? "L"
-                                  ]
+    let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "M0.m1:gmoverid"
+                                 , T.abs $ (dfRaw ?? "M0.m1:id")  / (dfRaw ?? "W")
+                                 , T.abs $ (dfRaw ?? "M0.m1:gds") / (dfRaw ?? "W")
+                                 , T.abs $  dfRaw ?? "M0.m1:fug"
+                                 ,          dfRaw ?? "M0.m1:vds"
+                                 ,          dfRaw ?? "M0.m1:vgs"
+                                 ,          dfRaw ?? "M0.m1:vbs"
+                                 ,          dfRaw ?? "M0.m1:vth"
+                                 ,          dfRaw ?? "M0.m1:id"
+                                 ,          dfRaw ?? "W"
+                                 ,          dfRaw ?? "L"
+                                 ]
+        dfRaw' = DataFrame cols vals
 
-    vals <- T.detach vals' >>= T.clone
-
-    let df''    = DataFrame cols vals
-        minX    = fst . T.minDim (T.Dim 0) T.RemoveDim 
-                . values . DF.lookup paramsX $ df''
-        maxX    = fst . T.maxDim (T.Dim 0) T.RemoveDim 
-                . values . DF.lookup paramsX $ df''
-        minY    = fst . T.minDim (T.Dim 0) T.RemoveDim 
-                . values . DF.lookup paramsY $ df''
-        maxY    = fst . T.maxDim (T.Dim 0) T.RemoveDim 
-                . values . DF.lookup paramsY $ df''
-
-    let sat   = satMask dev df''
+    let sat   = satMask dev dfRaw'
         sat'  = T.logicalNot sat
         nSat' = (`div` 4) . head . T.shape . T.nonzero $ sat
-        dfSat = rowFilter sat df''
 
-    dfSat' <- DF.sampleIO nSat' False $ rowFilter sat' df''
-    dfS    <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
+    let dfSat = rowFilter sat dfRaw'
 
-    let !df = DF.dropNan 
-            $ DF.union (process minX maxX maskX <$> DF.lookup paramsX dfS) 
-                       (process minY maxY maskY <$> DF.lookup paramsY dfS)
+    dfSat'  <- DF.sampleIO nSat' False $ rowFilter sat' dfRaw'
+    dfShuff <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
+
+    let dfX' = DF.dropNan $ trafo maskX <$> DF.lookup paramsX dfShuff
+        dfY' = DF.dropNan $ trafo maskY <$> DF.lookup paramsY dfShuff
+
+    let minX = fst . T.minDim (T.Dim 0) T.RemoveDim . values $ dfX'
+        maxX = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfX'
+        minY = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfY'
+        maxY = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfY'
+
+    let dfX = scale minX maxX <$> dfX'
+        dfY = scale minY maxY <$> dfY'
+
+    let !df = DF.dropNan $ DF.union dfX dfY
 
     net <- T.toDevice gpu <$> T.sample (OpNetSpec numX numY)
 
     let opt = T.mkAdam 0 β1 β2 $ NN.flattenParameters net
-    
+
     let (!trainX, !validX, !trainY, !validY) = 
                 trainTestSplit paramsX paramsY testSplit df
 
@@ -171,16 +177,15 @@ run Args{..} = do
         !batchesX' = T.split size (T.Dim 0) . T.toDevice gpu $ validX
         !batchesY' = T.split size (T.Dim 0) . T.toDevice gpu $ validY
 
-    (net', opt') <- runEpochs path num batchesX batchesX' 
-                                       batchesY batchesY' 
-                              net opt
+    (net', opt') <- runEpochs modelPath num batchesX batchesX'
+                              batchesY batchesY' net opt
 
-    saveCheckPoint path net' opt'
+    saveCheckPoint modelPath net' opt'
 
     net'' <- T.toDevice cpu <$> noGrad net'
     let predict   = predictor minX maxX minY maxY maskX maskY net''
-        traceData = values $ DF.lookup paramsX dfS
-        tracePath = path ++ "/trace.pt"
+        traceData = values $ DF.lookup paramsX dfRaw
+        tracePath = modelPath ++ "/trace.pt"
 
     traceModel dev pdk traceData predict >>= saveInferenceModel tracePath
 
