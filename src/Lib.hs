@@ -159,7 +159,8 @@ trainStyle epoch = Style { styleOpen          = "╢"
                          , styleDone          = '█'
                          , styleCurrent       = '░'
                          , styleTodo          = '░'
-                         , stylePrefix        = msg . pack $ "Training Epoch " ++ show epoch
+                         , stylePrefix        = msg . pack $ "Training Epoch " 
+                                                                ++ show epoch
                          , stylePostfix       = percentage
                          , styleWidth         = ConstantWidth 60
                          , styleEscapeOpen    = const empty
@@ -179,7 +180,8 @@ validStyle epoch = Style { styleOpen          = "╢"
                          , styleDone          = '█'
                          , styleCurrent       = '░'
                          , styleTodo          = '░'
-                         , stylePrefix        = msg . pack $ "Validation Epoch " ++ show epoch
+                         , stylePrefix        = msg . pack $ "Validation Epoch " 
+                                                                ++ show epoch
                          , stylePostfix       = percentage
                          , styleWidth         = ConstantWidth 60
                          , styleEscapeOpen    = const empty
