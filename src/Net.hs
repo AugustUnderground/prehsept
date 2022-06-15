@@ -80,17 +80,15 @@ scale  xMin xMax x  = (x - xMin) / (xMax - xMin)
 
 -- | Un-Scale data from [0;1]
 scale' :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
-scale' xMin xMax x' = x' * (xMax - xMin) + xMin
+scale' xMin xMax x' = (x' * (xMax - xMin)) + xMin
 
 -- | Transform Masked Data 
 trafo :: T.Tensor -> T.Tensor -> T.Tensor
-trafo xMask x  = T.where' cond (T.log10 . T.abs $ x) x
-  where
-    cond =  T.logicalAnd xMask (x `T.ne` 0.0)
+trafo mask x  = T.where' mask (T.log10 . T.abs $ x) x
 
 -- | Inverse Transform Masked Data 
 trafo' :: T.Tensor -> T.Tensor -> T.Tensor
-trafo' yMask y = T.where' yMask (T.pow (10.0 :: Float) y) y
+trafo' mask x = T.where' mask (T.pow (10.0 :: Float) x) x
 
 ------------------------------------------------------------------------------
 -- Serialization
