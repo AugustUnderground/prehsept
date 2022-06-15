@@ -188,6 +188,16 @@ instance GHC.Show.Show a => GHC.Show.Show (Data.Frame.DataFrame a)
 instance GHC.Base.Functor Data.Frame.DataFrame
 
 
+-- | Hyper Parameters of OpNet
+module Torch.Extensions
+
+-- | <tt>pow</tt> the other way around
+pow' :: Float -> Tensor -> Tensor
+
+-- | The inverse of <tt>log10</tt>
+pow10 :: Tensor -> Tensor
+
+
 -- | Neural Network Definition and Training
 module Net
 
