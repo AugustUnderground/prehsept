@@ -5,10 +5,11 @@
 -- | A module for storing Tabular Data as Tensors
 module Data.Frame where
 
+import           Data.List                             (elemIndex)
 import           Lib                            hiding (round)
 import           Prelude                        hiding (lookup, concat)
 import qualified Torch                     as T
-import qualified Torch.Functional.Internal as T        (isinf)
+import qualified Torch.Functional.Internal as T        (isinf, argsort)
 
 ------------------------------------------------------------------------------
 -- Base Data Type
@@ -74,6 +75,14 @@ rowFilter msk = rowSelect idx
   where
     idx = T.squeezeAll . T.indexSelect' 1 [0] . T.nonzero $ msk
 
+-- | Sort Data Frame Ascending or Descending
+sort :: Bool -> String -> DataFrame T.Tensor -> DataFrame T.Tensor
+sort desc col df@DataFrame{..} = rowSelect idx df
+  where
+    Just colIdx = elemIndex col columns
+    idx         = T.squeezeAll . T.indexSelect' 1 [colIdx] 
+                $ T.argsort values 0 desc
+
 -- | Drop given Rows from Data Frame
 rowDrop :: T.Tensor -> DataFrame T.Tensor -> DataFrame T.Tensor
 rowDrop idx df = rowSelect rows df
@@ -90,15 +99,18 @@ rowDrop' idx = rowDrop idx'
   where
     idx' = T.asTensor idx
 
--- | Drop all Rows with NaNs and Infs
-dropNan :: DataFrame T.Tensor -> DataFrame T.Tensor
-dropNan df = rowDrop idx df
+-- | Row index of all NaNs and Infs in Data Frame
+idxNan :: DataFrame T.Tensor -> T.Tensor
+idxNan df = T.squeezeAll $ T.cat (T.Dim 0) [infIdx, nanIdx]
   where
     infIdx = T.squeezeAll . T.indexSelect' 1 [0]
            . T.nonzero . T.isinf . values $ df
     nanIdx = T.squeezeAll . T.indexSelect' 1 [0]
            . T.nonzero . T.isnan . values $ df
-    idx    = T.cat (T.Dim 0) [infIdx, nanIdx]
+
+-- | Drop all Rows with NaNs and Infs (just calls idxNan and rowDrop)
+dropNan :: DataFrame T.Tensor -> DataFrame T.Tensor
+dropNan df = rowDrop (idxNan df) df
 
 -- | Update given columns with new values (Tensor dimensions must match)
 update :: [String] -> T.Tensor -> DataFrame T.Tensor -> DataFrame T.Tensor
