@@ -147,6 +147,7 @@ sampleIO num replace df = do
 shuffleIO :: DataFrame T.Tensor -> IO (DataFrame T.Tensor)
 shuffleIO df = sampleIO (nRows df) False df
 
+-- | Split a dataframe according to a given ratio
 trainTestSplit :: [String] -> [String] -> Float -> DataFrame T.Tensor
                -> (T.Tensor, T.Tensor, T.Tensor, T.Tensor)
 trainTestSplit paramsX paramsY trainSize df = (trainX, validX, trainY, validY)
