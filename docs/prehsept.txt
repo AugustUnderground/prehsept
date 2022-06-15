@@ -146,13 +146,19 @@ rowSelect :: Tensor -> DataFrame Tensor -> DataFrame Tensor
 -- | Filter Rows by condtion
 rowFilter :: Tensor -> DataFrame Tensor -> DataFrame Tensor
 
+-- | Sort Data Frame Ascending or Descending
+sort :: Bool -> String -> DataFrame Tensor -> DataFrame Tensor
+
 -- | Drop given Rows from Data Frame
 rowDrop :: Tensor -> DataFrame Tensor -> DataFrame Tensor
 
 -- | Drop given Rows from Data Frame
 rowDrop' :: [Int] -> DataFrame Tensor -> DataFrame Tensor
 
--- | Drop all Rows with NaNs and Infs
+-- | Row index of all NaNs and Infs in Data Frame
+idxNan :: DataFrame Tensor -> Tensor
+
+-- | Drop all Rows with NaNs and Infs (just calls idxNan and rowDrop)
 dropNan :: DataFrame Tensor -> DataFrame Tensor
 
 -- | Update given columns with new values (Tensor dimensions must match)
