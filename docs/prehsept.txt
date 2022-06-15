@@ -93,10 +93,10 @@ Args :: PDK -> Device -> FilePath -> Int -> Int -> Args
 [size] :: Args -> Int
 
 -- | Progress Bar Style for Training
-trainStyle :: Style s
+trainStyle :: Int -> Style s
 
 -- | Progress Bar Style for Validation
-validStyle :: Style s
+validStyle :: Int -> Style s
 instance GHC.Classes.Eq Lib.PDK
 instance GHC.Classes.Eq Lib.Device
 instance GHC.Show.Show Lib.Args
@@ -175,6 +175,8 @@ sampleIO :: Int -> Bool -> DataFrame Tensor -> IO (DataFrame Tensor)
 
 -- | Shuffle all rows
 shuffleIO :: DataFrame Tensor -> IO (DataFrame Tensor)
+
+-- | Split a dataframe according to a given ratio
 trainTestSplit :: [String] -> [String] -> Float -> DataFrame Tensor -> (Tensor, Tensor, Tensor, Tensor)
 instance GHC.Show.Show a => GHC.Show.Show (Data.Frame.DataFrame a)
 instance GHC.Base.Functor Data.Frame.DataFrame
@@ -272,8 +274,11 @@ module Run
 -- | Filter Datapoints not in saturation
 satMask :: Device -> DataFrame Tensor -> Tensor
 
--- | Process Data
-process :: Tensor -> Tensor -> Tensor -> Tensor -> Tensor
+-- | Scale and transform a Tensor
+process' :: Tensor -> Tensor -> Tensor -> Tensor -> Tensor
+
+-- | Scale and transform a DataFrame
+process :: Tensor -> Tensor -> Tensor -> DataFrame Tensor -> DataFrame Tensor
 
 -- | Run one Update Step
 trainStep :: Tensor -> Tensor -> OpNet -> Adam -> IO (OpNet, Adam, Tensor)
