@@ -130,16 +130,16 @@ run Args{..} = do
     dfRaw      <- DF.fromFile dir
 
     let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "M0.m1:gmoverid"
-                                 , T.abs $ (dfRaw ?? "M0.m1:id")  / (dfRaw ?? "W")
-                                 , T.abs $ (dfRaw ?? "M0.m1:gds") / (dfRaw ?? "W")
                                  , T.abs $  dfRaw ?? "M0.m1:fug"
                                  ,          dfRaw ?? "M0.m1:vds"
-                                 ,          dfRaw ?? "M0.m1:vgs"
                                  ,          dfRaw ?? "M0.m1:vbs"
+                                 , T.abs $ (dfRaw ?? "M0.m1:id")  / (dfRaw ?? "W")
+                                 ,          dfRaw ?? "L"
+                                 , T.abs $ (dfRaw ?? "M0.m1:gds") / (dfRaw ?? "W")
+                                 ,          dfRaw ?? "M0.m1:vgs"
                                  ,          dfRaw ?? "M0.m1:vth"
                                  ,          dfRaw ?? "M0.m1:id"
                                  ,          dfRaw ?? "W"
-                                 ,          dfRaw ?? "L"
                                  ]
         dfRaw' = DF.dropNan $ DataFrame cols vals
 
