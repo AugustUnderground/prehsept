@@ -88,7 +88,9 @@ trafo mask x  = T.where' mask (T.log10 . T.abs $ x) x
 
 -- | Inverse Transform Masked Data 
 trafo' :: T.Tensor -> T.Tensor -> T.Tensor
-trafo' mask x = T.where' mask (T.pow (10.0 :: Float) x) x
+trafo' mask x = T.where' mask (T.powt ten x) x
+  where
+    ten = T.asTensor ([10] :: [Float])
 
 ------------------------------------------------------------------------------
 -- Serialization
