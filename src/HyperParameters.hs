@@ -12,10 +12,10 @@ import qualified Torch as T
 
 -- | First gradient momentum estimate, default = 0.9
 β1 :: Float
-β1 = 0.5
+β1 = 0.9
 -- | second gradient momentum estimate, default = 0.999 
 β2 :: Float
-β2 = 0.93
+β2 = 0.999
 -- | Learning Rate
 α :: T.Tensor
 α  = T.asTensor' (0.001 :: Float) 
