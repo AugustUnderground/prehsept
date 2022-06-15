@@ -18,6 +18,7 @@ import           GHC.Generics
 import qualified Torch                     as T
 import qualified Torch.NN                  as NN
 import qualified Torch.Functional.Internal as T (where')
+import qualified Torch.Extensions          as T
 
 ------------------------------------------------------------------------------
 -- Utilities
@@ -88,9 +89,7 @@ trafo mask x  = T.where' mask (T.log10 . T.abs $ x) x
 
 -- | Inverse Transform Masked Data 
 trafo' :: T.Tensor -> T.Tensor -> T.Tensor
-trafo' mask x = T.where' mask (T.powt ten x) x
-  where
-    ten = T.asTensor ([10] :: [Float])
+trafo' mask x = T.where' mask (T.pow10 x) x
 
 ------------------------------------------------------------------------------
 -- Serialization

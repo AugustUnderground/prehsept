@@ -32,6 +32,7 @@ library
       Lib
       Net
       Run
+      Torch.Extensions
   other-modules:
       Paths_prehsept
   hs-source-dirs:
