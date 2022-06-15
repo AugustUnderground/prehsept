@@ -84,7 +84,9 @@ scale' xMin xMax x' = x' * (xMax - xMin) + xMin
 
 -- | Transform Masked Data 
 trafo :: T.Tensor -> T.Tensor -> T.Tensor
-trafo xMask x  = T.where' xMask (T.log10 . T.abs $ x) x
+trafo xMask x  = T.where' cond (T.log10 . T.abs $ x) x
+  where
+    cond =  T.logicalAnd xMask (x `T.ne` 0.0)
 
 -- | Inverse Transform Masked Data 
 trafo' :: T.Tensor -> T.Tensor -> T.Tensor
