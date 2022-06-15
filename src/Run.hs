@@ -126,8 +126,8 @@ run :: Args
 run Args{..} = do
     putStrLn $ "Training " ++ show dev ++ " Model in " ++ show pdk ++ "."
 
-    modelPath <- createModelDir pdk' dev'
-    dfRaw     <- DF.fromFile dir
+    modelPath  <- createModelDir pdk' dev'
+    dfRaw      <- DF.fromFile dir
 
     let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "M0.m1:gmoverid"
                                  , T.abs $ (dfRaw ?? "M0.m1:id")  / (dfRaw ?? "W")
@@ -141,63 +141,64 @@ run Args{..} = do
                                  ,          dfRaw ?? "W"
                                  ,          dfRaw ?? "L"
                                  ]
-        dfRaw' = DataFrame cols vals
+        dfRaw' = DF.dropNan $ DataFrame cols vals
 
-    let sat   = satMask dev dfRaw'
-        sat'  = T.logicalNot sat
-        nSat' = (`div` 4) . head . T.shape . T.nonzero $ sat
+    let sat    = satMask dev dfRaw'
+        sat'   = T.logicalNot sat
+        nSat'  = (`div` 4) . head . T.shape . T.nonzero $ sat
+        dfSat  = rowFilter sat dfRaw'
 
-    let dfSat = rowFilter sat dfRaw'
+    dfSat'     <- DF.sampleIO nSat' False $ rowFilter sat' dfRaw'
 
-    dfSat'  <- DF.sampleIO nSat' False $ rowFilter sat' dfRaw'
-    dfShuff <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
+    dfShuff    <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
 
-    let dfX' = DF.dropNan $ trafo maskX <$> DF.lookup paramsX dfShuff
-        dfY' = DF.dropNan $ trafo maskY <$> DF.lookup paramsY dfShuff
+    let dfT    = DF.dropNan 
+               $ DF.union (trafo maskX <$> DF.lookup paramsX dfShuff)
+                          (trafo maskY <$> DF.lookup paramsY dfShuff)
+        dfX'   = DF.lookup paramsX dfT
+        dfY'   = DF.lookup paramsY dfT
 
-    let minX = fst . T.minDim (T.Dim 0) T.RemoveDim . values $ dfX'
-        maxX = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfX'
-        minY = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfY'
-        maxY = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfY'
+    let minX   = fst . T.minDim (T.Dim 0) T.RemoveDim . values $ dfX'
+        maxX   = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfX'
+        minY   = fst . T.minDim (T.Dim 0) T.RemoveDim . values $ dfY'
+        maxY   = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfY'
 
-    let dfX = scale minX maxX <$> dfX'
-        dfY = scale minY maxY <$> dfY'
+    let dfX    = scale minX maxX <$> dfX'
+        dfY    = scale minY maxY <$> dfY'
 
-    let !df = DF.dropNan $ DF.union dfX dfY
+    let !df    = DF.dropNan $ DF.union dfX dfY
 
-    net <- T.toDevice gpu <$> T.sample (OpNetSpec numX numY)
+    net        <- T.toDevice gpu <$> T.sample (OpNetSpec numX numY)
+    let opt    = T.mkAdam 0 β1 β2 $ NN.flattenParameters net
 
-    let opt = T.mkAdam 0 β1 β2 $ NN.flattenParameters net
-
-    let (!trainX, !validX, !trainY, !validY) = 
+    let (!trainX', !validX', !trainY', !validY') = 
                 trainTestSplit paramsX paramsY testSplit df
 
-    let !batchesX  = T.split size (T.Dim 0) . T.toDevice gpu $ trainX
-        !batchesY  = T.split size (T.Dim 0) . T.toDevice gpu $ trainY
-        !batchesX' = T.split size (T.Dim 0) . T.toDevice gpu $ validX
-        !batchesY' = T.split size (T.Dim 0) . T.toDevice gpu $ validY
+    let trainX = T.split size (T.Dim 0) . T.toDevice gpu $ trainX'
+        trainY = T.split size (T.Dim 0) . T.toDevice gpu $ trainY'
+        validX = T.split size (T.Dim 0) . T.toDevice gpu $ validX'
+        validY = T.split size (T.Dim 0) . T.toDevice gpu $ validY'
 
-    (net', opt') <- runEpochs modelPath num batchesX batchesX'
-                              batchesY batchesY' net opt
+    (net', opt') <- runEpochs modelPath num trainX validX trainY validY net opt
 
     saveCheckPoint modelPath net' opt'
 
-    net'' <- T.toDevice cpu <$> noGrad net'
+    net''         <- T.toDevice cpu <$> noGrad net'
     let predict   = predictor minX maxX minY maxY maskX maskY net''
-        traceData = values $ DF.lookup paramsX dfRaw
+        traceData = values $ DF.lookup paramsX dfRaw'
         tracePath = modelPath ++ "/trace.pt"
 
-    traceModel dev pdk traceData predict >>= saveInferenceModel tracePath
+    putStrLn $ "Final Checkpoint saved at: " ++ modelPath
+    putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    pure ()
+    traceModel dev pdk traceData predict >>= saveInferenceModel tracePath
   where
     pdk'      = show pdk
     dev'      = show dev
     testSplit = 0.8
-    cols      = [ "gmoverid", "idoverw", "gdsoverw", "fug"
-                , "Vds", "Vgs", "Vbs", "vth", "id", "W", "L" ]
     paramsX   = ["gmoverid", "fug", "Vds", "Vbs"]
     paramsY   = ["idoverw", "L", "gdsoverw", "Vgs"]
+    cols      = paramsX ++ paramsY ++ ["vth", "id", "W"]
     numX      = length paramsX
     numY      = length paramsY
     maskX     = boolMask' ["fug"] paramsX
