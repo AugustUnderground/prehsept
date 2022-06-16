@@ -256,7 +256,7 @@ saveCheckPoint :: FilePath -> OpNet -> Adam -> IO ()
 loadCheckPoint :: FilePath -> Int -> Int -> Int -> IO (OpNet, Adam)
 
 -- | Trace and Return a Script Module
-traceModel :: Device -> PDK -> Tensor -> (Tensor -> Tensor) -> IO ScriptModule
+traceModel :: Device -> PDK -> Int -> (Tensor -> Tensor) -> IO ScriptModule
 
 -- | Save a Traced ScriptModule
 saveInferenceModel :: FilePath -> ScriptModule -> IO ()
