@@ -133,10 +133,10 @@ loadCheckPoint path numX numY iter = do
     pure (net, opt)
 
 -- | Trace and Return a Script Module
-traceModel :: Device -> PDK -> T.Tensor -> (T.Tensor -> T.Tensor) 
+traceModel :: Device -> PDK -> Int -> (T.Tensor -> T.Tensor) 
            -> IO T.ScriptModule
-traceModel dev pdk inputs predict = 
-        T.trace name "forward" fun [inputs] >>= T.toScriptModule
+traceModel dev pdk nInputs predict = 
+        T.trace name "forward" fun [T.ones' [1, nInputs]] >>= T.toScriptModule
   where
     fun = mapM (T.detach . predict)
     name = show pdk ++ "_" ++ show dev

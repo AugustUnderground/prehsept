@@ -185,13 +185,12 @@ run Args{..} = do
 
     net''         <- T.toDevice cpu <$> noGrad net'
     let predict   = predictor minX maxX minY maxY maskX maskY net''
-        traceData = values $ DF.lookup paramsX dfRaw'
         tracePath = modelPath ++ "/trace.pt"
 
     putStrLn $ "Final Checkpoint saved at: " ++ modelPath
     putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    traceModel dev pdk traceData predict >>= saveInferenceModel tracePath
+    traceModel dev pdk numX predict >>= saveInferenceModel tracePath
   where
     pdk'      = show pdk
     dev'      = show dev
