@@ -117,7 +117,7 @@ run Args{..} = do
     putStrLn $ "Training " ++ show dev ++ " Model in " ++ show pdk ++ "."
 
     modelPath  <- createModelDir pdk' dev'
-    dfRaw      <- DF.fromFile dir
+    dfRaw      <- DF.fromFile pdk dir
 
     let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "M0.m1:gmoverid"
                                  , T.abs $  dfRaw ?? "M0.m1:fug"
