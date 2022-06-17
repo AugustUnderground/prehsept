@@ -89,13 +89,14 @@ loadCheckPoint path spec iter = do
     pure (net, opt)
 
 -- | Trace and Return a Script Module
-traceModel :: Device -> PDK -> T.Tensor -> (T.Tensor -> T.Tensor) 
+traceModel :: Device -> PDK -> Int -> (T.Tensor -> T.Tensor) 
            -> IO T.ScriptModule
-traceModel dev pdk traceData predict = do
-        T.trace name "forward" fun [traceData] >>= T.toScriptModule
+traceModel dev pdk num predict = do
+        T.trace name "forward" fun data' >>= T.toScriptModule
   where
-    fun  = mapM (T.detach . predict)
-    name = show pdk ++ "_" ++ show dev
+    fun   = mapM (T.detach . predict)
+    name  = show pdk ++ "_" ++ show dev
+    data' = [T.ones' [1, num]]
 
 -- | Save a Traced ScriptModule
 saveInferenceModel :: FilePath -> T.ScriptModule -> IO ()

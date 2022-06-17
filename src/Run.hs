@@ -175,18 +175,16 @@ run Args{..} = do
     !net'' <- T.toDevice T.cpu <$> noGrad net'
 
     let tracePath = modelPath ++ "/trace.pt"
-        traceData = T.ones' [1, numInputs]
-
-    let predict = trafo' maskY
-                . scale' minY maxY
-                . forward net''
-                . scale minX maxX
-                . trafo maskX
+        predict   = trafo' maskY
+                  . scale' minY maxY
+                  . forward net''
+                  . scale minX maxX
+                  . trafo maskX
 
     putStrLn $ "Final Checkpoint saved at: " ++ modelPath
     putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    traceModel dev pdk traceData predict >>= saveInferenceModel tracePath
+    traceModel dev pdk numInputs predict >>= saveInferenceModel tracePath
   where
     pdk'       = show pdk
     dev'       = show dev
