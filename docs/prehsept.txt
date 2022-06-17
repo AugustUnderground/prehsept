@@ -47,6 +47,18 @@ XH018 :: PDK
 -- | X-Fab XT018 180nm Process
 XT018 :: PDK
 
+-- | Fictional Cadence GPDK180 GPDK 180nm Process
+GPDK180 :: PDK
+
+-- | Fictional Cadence GPDK90 GPDK 90nm Process
+GPDK90 :: PDK
+
+-- | SkyWater SKY130 130nm Process
+SKY130 :: PDK
+
+-- | Fictional Predictive Technology Models PTM130 130nm Process
+PTM130 :: PDK
+
 -- | Device Types
 data Device
 
@@ -90,7 +102,7 @@ trafo :: Tensor -> Tensor -> Tensor
 trafo' :: Tensor -> Tensor -> Tensor
 
 -- | Default Column Names for stored Tensors
-defaultHeaders :: [String]
+columnHeader :: PDK -> [String]
 
 -- | Load a Pickled Tensor from file
 loadTensor :: FilePath -> IO Tensor
@@ -215,7 +227,7 @@ nCols :: DataFrame Tensor -> Int
 fromFile' :: [String] -> FilePath -> IO (DataFrame Tensor)
 
 -- | Load Tensor from file and construct DataFrame with default Header
-fromFile :: FilePath -> IO (DataFrame Tensor)
+fromFile :: PDK -> FilePath -> IO (DataFrame Tensor)
 
 -- | Look up columns
 lookup :: [String] -> DataFrame Tensor -> DataFrame Tensor
