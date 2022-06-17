@@ -3,8 +3,8 @@
 -- | Hyper Parameters of OpNet
 module HyperParameters where
 
-import           Net
-import qualified Torch as T
+import qualified Torch            as T
+import qualified Torch.Extensions as T
 
 ------------------------------------------------------------------------------
 -- Adam
@@ -19,4 +19,4 @@ import qualified Torch as T
 -- | Learning Rate
 α :: T.Tensor
 α  = T.asTensor' (0.001 :: Float) 
-   . T.withDType T.Float . T.withDevice gpu $ T.defaultOpts
+   . T.withDType T.Float . T.withDevice T.gpu $ T.defaultOpts

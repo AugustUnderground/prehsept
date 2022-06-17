@@ -15,30 +15,16 @@ module Net where
 
 import           Lib
 import           GHC.Generics
-import qualified Torch                     as T
-import qualified Torch.NN                  as NN
-import qualified Torch.Functional.Internal as T (where')
-import qualified Torch.Extensions          as T
-
-------------------------------------------------------------------------------
--- Utilities
-------------------------------------------------------------------------------
-
--- | GPU
-gpu :: T.Device
-gpu = T.Device T.CUDA 1
-
--- | CPU
-cpu :: T.Device
-cpu = T.Device T.CPU 0
+import qualified Torch        as T
+import qualified Torch.NN     as NN
 
 ------------------------------------------------------------------------------
 -- Neural Network
 ------------------------------------------------------------------------------
 
 -- | Neural Network Specification
-data OpNetSpec = OpNetSpec { numX :: Int -- ^ Number of input neurons
-                           , numY :: Int -- ^ Number of output neurons
+data OpNetSpec = OpNetSpec { numX   :: Int       -- ^ Number of input neurons
+                           , numY   :: Int       -- ^ Number of output neurons
                            } deriving (Show, Eq)
 
 -- | Network Architecture
@@ -53,15 +39,15 @@ data OpNet = OpNet { fc0 :: T.Linear
 
 -- | Neural Network Weight initialization
 instance T.Randomizable OpNetSpec OpNet where
-    sample OpNetSpec{..} = OpNet <$> T.sample (T.LinearSpec numX 32)
-                                 <*> T.sample (T.LinearSpec 32   128)
-                                 <*> T.sample (T.LinearSpec 128  512)
-                                 <*> T.sample (T.LinearSpec 512  128)
-                                 <*> T.sample (T.LinearSpec 128  64)
-                                 <*> T.sample (T.LinearSpec 64   32)
-                                 <*> T.sample (T.LinearSpec 32   numY)
+    sample OpNetSpec{..} = OpNet <$> T.sample (T.LinearSpec   numX 32)
+                                 <*> T.sample (T.LinearSpec   32   128)
+                                 <*> T.sample (T.LinearSpec   128  512)
+                                 <*> T.sample (T.LinearSpec   512  128)
+                                 <*> T.sample (T.LinearSpec   128  64)
+                                 <*> T.sample (T.LinearSpec   64   32)
+                                 <*> T.sample (T.LinearSpec   32   numY)
 
--- | Neural Network Forward Pass
+-- | Neural Network Forward Pass with scaled Data
 forward :: OpNet -> T.Tensor -> T.Tensor
 forward OpNet{..} = T.linear fc6 . T.relu
                   . T.linear fc5 . T.relu
@@ -69,27 +55,7 @@ forward OpNet{..} = T.linear fc6 . T.relu
                   . T.linear fc3 . T.relu
                   . T.linear fc2 . T.relu
                   . T.linear fc1 . T.relu
-                  . T.linear fc0
-
-------------------------------------------------------------------------------
--- Data Processing
-------------------------------------------------------------------------------
-
--- | Scale data to [0;1]
-scale :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
-scale  xMin xMax x  = (x - xMin) / (xMax - xMin)
-
--- | Un-Scale data from [0;1]
-scale' :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
-scale' xMin xMax x' = (x' * (xMax - xMin)) + xMin
-
--- | Transform Masked Data 
-trafo :: T.Tensor -> T.Tensor -> T.Tensor
-trafo mask x  = T.where' mask (T.log10 . T.abs $ x) x
-
--- | Inverse Transform Masked Data 
-trafo' :: T.Tensor -> T.Tensor -> T.Tensor
-trafo' mask x = T.where' mask (T.pow10 x) x
+                  . T.linear fc0 
 
 ------------------------------------------------------------------------------
 -- Serialization
@@ -101,15 +67,6 @@ noGrad net = do
     params  <- mapM (T.detach . T.toDependent) $ NN.flattenParameters net
     params' <- mapM (`T.makeIndependentWithRequiresGrad` False) params
     pure $ NN.replaceParameters net params'
-
--- | Wrapper for Network predictions including scaling and transformation
-predictor :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor 
-          -> T.Tensor -> OpNet -> T.Tensor -> T.Tensor
-predictor xMin xMax yMin yMax xMask yMask net = trafo' yMask     -- Reverse Transform Outputs
-                                              . scale' yMin yMax -- Unscale NN Outputs
-                                              . forward net      -- Feed through NN
-                                              . scale xMin xMax  -- Scale NN Inputs
-                                              . trafo xMask      -- Transform NN Inputs
 
 ------------------------------------------------------------------------------
 -- Saving and Loading
@@ -123,22 +80,21 @@ saveCheckPoint path net opt = do
     T.save (T.m2 opt) (path ++ "/M2.pt")
 
 -- | Load a Saved Model and Optimizer CheckPoint
-loadCheckPoint :: FilePath -> Int -> Int -> Int -> IO (OpNet, T.Adam)
-loadCheckPoint path numX numY iter = do
-    net <- T.sample (OpNetSpec numX numY) 
-                >>= (`T.loadParams` (path ++ "/model.pt"))
+loadCheckPoint :: FilePath -> OpNetSpec -> Int -> IO (OpNet, T.Adam)
+loadCheckPoint path spec iter = do
+    net <- T.sample spec >>= (`T.loadParams` (path ++ "/model.pt"))
     m1' <- T.load (path ++ "/M1.pt")
     m2' <- T.load (path ++ "/M2.pt")
     let opt = T.Adam 0.9 0.999 m1' m2' iter
     pure (net, opt)
 
 -- | Trace and Return a Script Module
-traceModel :: Device -> PDK -> Int -> (T.Tensor -> T.Tensor) 
+traceModel :: Device -> PDK -> T.Tensor -> (T.Tensor -> T.Tensor) 
            -> IO T.ScriptModule
-traceModel dev pdk nInputs predict = 
-        T.trace name "forward" fun [T.ones' [1, nInputs]] >>= T.toScriptModule
+traceModel dev pdk traceData predict = do
+        T.trace name "forward" fun [traceData] >>= T.toScriptModule
   where
-    fun = mapM (T.detach . predict)
+    fun  = mapM (T.detach . predict)
     name = show pdk ++ "_" ++ show dev
 
 -- | Save a Traced ScriptModule

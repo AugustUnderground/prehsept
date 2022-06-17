@@ -7,13 +7,15 @@ module Lib where
 
 import           Data.Maybe
 import           Data.List
-import           Data.Text.Internal.Lazy      (empty)
-import           Data.Text.Lazy               (pack)
-import           Data.Time.Clock              (getCurrentTime)
-import           Data.Time.Format             (formatTime, defaultTimeLocale)
+import           Data.Text.Internal.Lazy        (empty)
+import           Data.Text.Lazy                 (pack)
+import           Data.Time.Clock                (getCurrentTime)
+import           Data.Time.Format               (formatTime, defaultTimeLocale)
 import           System.Directory
 import           System.ProgressBar
-import qualified Torch                   as T
+import qualified Torch                     as T
+import qualified Torch.Extensions          as T
+import qualified Torch.Functional.Internal as T (where')
 
 ------------------------------------------------------------------------------
 -- Data Types
@@ -85,6 +87,26 @@ round :: Int -> T.Tensor -> T.Tensor
 round digits = (* (1 / d)) . T.ceil . (* d)
   where
     d = T.asTensor $ 10 ** (realToFrac digits :: Float)
+
+------------------------------------------------------------------------------
+-- Scaling and Transforming
+------------------------------------------------------------------------------
+
+-- | Scale data to [0;1]
+scale :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
+scale xMin xMax x = (x - xMin) / (xMax - xMin)
+
+-- | Un-Scale data from [0;1]
+scale' :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
+scale' xMin xMax x = (x * (xMax - xMin)) + xMin
+
+-- | Apply log10 to masked data
+trafo :: T.Tensor -> T.Tensor -> T.Tensor
+trafo xMask x = T.where' xMask (T.log10 $ T.abs x) x
+
+-- | Apply pow10 to masked data
+trafo' :: T.Tensor -> T.Tensor -> T.Tensor
+trafo' xMask x = T.where' xMask (T.pow10 x) x
 
 ------------------------------------------------------------------------------
 -- Saving and Loading Tensors

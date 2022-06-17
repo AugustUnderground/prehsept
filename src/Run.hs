@@ -10,9 +10,10 @@ import           System.ProgressBar
 import           Lib
 import           Net
 import           HyperParameters
-import           Data.Frame as DF
-import qualified Torch      as T
-import qualified Torch.NN   as NN
+import           Data.Frame       as DF
+import qualified Torch            as T
+import qualified Torch.Extensions as T
+import qualified Torch.NN         as NN
 
 ------------------------------------------------------------------------------
 -- Utility and Helpers
@@ -28,17 +29,6 @@ satMask PMOS df = T.logicalAnd (T.abs (df ?? "Vgs") `T.gt` T.abs (df ?? "vth"))
                 . T.logicalAnd (T.abs (df ?? "Vds") `T.gt` 
                         (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
                 $ (0.0 `T.lt` (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
-
--- | Scale and transform a Tensor
-process' :: T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor -> T.Tensor
-process' mi ma ms = scale mi ma . trafo ms
-
--- | Scale and transform a DataFrame
-process :: T.Tensor -> T.Tensor -> T.Tensor -> DataFrame T.Tensor 
-        -> DataFrame T.Tensor
-process mi ma ms DataFrame{..} = DataFrame columns values'
-  where
-    values' = process' mi ma ms values
 
 ------------------------------------------------------------------------------
 -- Training
@@ -150,7 +140,7 @@ run Args{..} = do
 
     dfSat'     <- DF.sampleIO nSat' False $ rowFilter sat' dfRaw'
 
-    dfShuff    <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
+    dfShuff    <- DF.shuffleIO (DF.concat [dfSat, dfSat'])
 
     let dfT    = DF.dropNan 
                $ DF.union (trafo maskX <$> DF.lookup paramsX dfShuff)
@@ -163,42 +153,48 @@ run Args{..} = do
         minY   = fst . T.minDim (T.Dim 0) T.RemoveDim . values $ dfY'
         maxY   = fst . T.maxDim (T.Dim 0) T.RemoveDim . values $ dfY'
 
-    let dfX    = scale minX maxX <$> dfX'
-        dfY    = scale minY maxY <$> dfY'
+    let !dfX   = scale minX maxX <$> dfX'
+        !dfY   = scale minY maxY <$> dfY'
+        !df    = DF.dropNan $ DF.union dfX dfY
 
-    let !df    = DF.dropNan $ DF.union dfX dfY
-
-    net        <- T.toDevice gpu <$> T.sample (OpNetSpec numX numY)
-    let opt    = T.mkAdam 0 β1 β2 $ NN.flattenParameters net
+    net        <- T.toDevice T.gpu <$> T.sample (OpNetSpec numInputs numOutputs)
+    let opt    =  T.mkAdam 0 β1 β2 $ NN.flattenParameters net
 
     let (!trainX', !validX', !trainY', !validY') = 
                 trainTestSplit paramsX paramsY testSplit df
 
-    let trainX = T.split size (T.Dim 0) . T.toDevice gpu $ trainX'
-        trainY = T.split size (T.Dim 0) . T.toDevice gpu $ trainY'
-        validX = T.split size (T.Dim 0) . T.toDevice gpu $ validX'
-        validY = T.split size (T.Dim 0) . T.toDevice gpu $ validY'
+    let trainX = T.split size (T.Dim 0) . T.toDevice T.gpu $ trainX'
+        trainY = T.split size (T.Dim 0) . T.toDevice T.gpu $ trainY'
+        validX = T.split size (T.Dim 0) . T.toDevice T.gpu $ validX'
+        validY = T.split size (T.Dim 0) . T.toDevice T.gpu $ validY'
 
     (net', opt') <- runEpochs modelPath num trainX validX trainY validY net opt
 
     saveCheckPoint modelPath net' opt'
 
-    net''         <- T.toDevice cpu <$> noGrad net'
-    let predict   = predictor minX maxX minY maxY maskX maskY net''
-        tracePath = modelPath ++ "/trace.pt"
+    !net'' <- T.toDevice T.cpu <$> noGrad net'
+
+    let tracePath = modelPath ++ "/trace.pt"
+        traceData = T.ones' [1, numInputs]
+
+    let predict = trafo' maskY
+                . scale' minY maxY
+                . forward net''
+                . scale minX maxX
+                . trafo maskX
 
     putStrLn $ "Final Checkpoint saved at: " ++ modelPath
     putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    traceModel dev pdk numX predict >>= saveInferenceModel tracePath
+    traceModel dev pdk traceData predict >>= saveInferenceModel tracePath
   where
-    pdk'      = show pdk
-    dev'      = show dev
-    testSplit = 0.8
-    paramsX   = ["gmoverid", "fug", "Vds", "Vbs"]
-    paramsY   = ["idoverw", "L", "gdsoverw", "Vgs"]
-    cols      = paramsX ++ paramsY ++ ["vth", "id", "W"]
-    numX      = length paramsX
-    numY      = length paramsY
-    maskX     = boolMask' ["fug"] paramsX
-    maskY     = boolMask' ["idoverw", "gdsoverw"] paramsY
+    pdk'       = show pdk
+    dev'       = show dev
+    testSplit  = 0.8
+    paramsX    = ["gmoverid", "fug", "Vds", "Vbs"]
+    paramsY    = ["idoverw", "L", "gdsoverw", "Vgs"]
+    cols       = paramsX ++ paramsY ++ ["vth", "id", "W"]
+    numInputs  = length paramsX
+    numOutputs = length paramsY
+    maskX      = boolMask' ["fug"] paramsX
+    maskY      = boolMask' ["idoverw", "gdsoverw"] paramsY
