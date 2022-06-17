@@ -22,21 +22,33 @@ import qualified Torch.Functional.Internal as T (where')
 ------------------------------------------------------------------------------
 
 -- | Available PDKs
-data PDK = XH035 -- ^ X-Fab XH035 350nm Process
-         | XH018 -- ^ X-Fab XH018 180nm Process
-         | XT018 -- ^ X-Fab XT018 180nm Process
+data PDK = XH035    -- ^ X-Fab XH035 350nm Process
+         | XH018    -- ^ X-Fab XH018 180nm Process
+         | XT018    -- ^ X-Fab XT018 180nm Process
+         | GPDK180  -- ^ Fictional Cadence GPDK180 GPDK 180nm Process
+         | GPDK90   -- ^ Fictional Cadence GPDK90 GPDK 90nm Process
+         | SKY130   -- ^ SkyWater SKY130 130nm Process
+         | PTM130   -- ^ Fictional Predictive Technology Models PTM130 130nm Process
     deriving (Eq)
 
 instance Show PDK where
-  show XH035 = "xh035"
-  show XH018 = "xh018"
-  show XT018 = "xt018"
+  show XH035   = "xh035"
+  show XH018   = "xh018"
+  show XT018   = "xt018"
+  show GPDK180 = "xt018"
+  show GPDK90  = "xt018"
+  show SKY130  = "xt018"
+  show PTM130  = "xt018"
 
 instance Read PDK where
-  readsPrec _ "xh035" = [(XH035, "")]
-  readsPrec _ "xh018" = [(XH018, "")]
-  readsPrec _ "xt018" = [(XT018, "")]
-  readsPrec _ _       = undefined
+  readsPrec _ "xh035"   = [(XH035, "")]
+  readsPrec _ "xh018"   = [(XH018, "")]
+  readsPrec _ "xt018"   = [(XT018, "")]
+  readsPrec _ "gpdk180" = [(GPDK180, "")]
+  readsPrec _ "gpdk90"  = [(GPDK90, "")]
+  readsPrec _ "sky130"  = [(SKY130, "")]
+  readsPrec _ "ptm130"  = [(PTM130, "")]
+  readsPrec _ _         = undefined
 
 -- | Device Types
 data Device = NMOS -- ^ NMOS
