@@ -10,6 +10,28 @@
 @version 0.6.6.6
 
 
+-- | Hyper Parameters of OpNet
+module Torch.Extensions
+
+-- | GPU
+gpu :: Device
+
+-- | CPU
+cpu :: Device
+
+-- | The inverse of <tt>log10</tt>
+pow10 :: Tensor -> Tensor
+
+-- | Because snake_case sucks and this project uses Float instead of Double
+nanToNum :: Float -> Float -> Float -> Tensor -> Tensor
+
+-- | Default limits for <a>nanToNum</a>
+nanToNum' :: Tensor -> Tensor
+
+-- | Default limits for <a>nanToNum</a> (0.0)
+nanToNum'' :: Tensor -> Tensor
+
+
 -- | Helper and Utility Functions
 module Lib
 
@@ -54,6 +76,18 @@ intIdx' :: [String] -> [String] -> Tensor
 
 -- | Round Float Tensor to n digits
 round :: Int -> Tensor -> Tensor
+
+-- | Scale data to [0;1]
+scale :: Tensor -> Tensor -> Tensor -> Tensor
+
+-- | Un-Scale data from [0;1]
+scale' :: Tensor -> Tensor -> Tensor -> Tensor
+
+-- | Apply log10 to masked data
+trafo :: Tensor -> Tensor -> Tensor
+
+-- | Apply pow10 to masked data
+trafo' :: Tensor -> Tensor -> Tensor
 
 -- | Default Column Names for stored Tensors
 defaultHeaders :: [String]
@@ -104,6 +138,58 @@ instance GHC.Show.Show Lib.Device
 instance GHC.Read.Read Lib.Device
 instance GHC.Show.Show Lib.PDK
 instance GHC.Read.Read Lib.PDK
+
+
+-- | Neural Network Definition and Training
+module Net
+
+-- | Neural Network Specification
+data OpNetSpec
+OpNetSpec :: Int -> Int -> OpNetSpec
+
+-- | Number of input neurons
+[numX] :: OpNetSpec -> Int
+
+-- | Number of output neurons
+[numY] :: OpNetSpec -> Int
+
+-- | Network Architecture
+data OpNet
+OpNet :: Linear -> Linear -> Linear -> Linear -> Linear -> Linear -> Linear -> OpNet
+[fc0] :: OpNet -> Linear
+[fc1] :: OpNet -> Linear
+[fc2] :: OpNet -> Linear
+[fc3] :: OpNet -> Linear
+[fc4] :: OpNet -> Linear
+[fc5] :: OpNet -> Linear
+[fc6] :: OpNet -> Linear
+
+-- | Neural Network Forward Pass with scaled Data
+forward :: OpNet -> Tensor -> Tensor
+
+-- | Remove Gradient for tracing / scripting
+noGrad :: Parameterized f => f -> IO f
+
+-- | Save Model and Optimizer Checkpoint
+saveCheckPoint :: FilePath -> OpNet -> Adam -> IO ()
+
+-- | Load a Saved Model and Optimizer CheckPoint
+loadCheckPoint :: FilePath -> OpNetSpec -> Int -> IO (OpNet, Adam)
+
+-- | Trace and Return a Script Module
+traceModel :: Device -> PDK -> Tensor -> (Tensor -> Tensor) -> IO ScriptModule
+
+-- | Save a Traced ScriptModule
+saveInferenceModel :: FilePath -> ScriptModule -> IO ()
+
+-- | Load a Traced ScriptModule
+loadInferenceModel :: FilePath -> IO ScriptModule
+instance GHC.Classes.Eq Net.OpNetSpec
+instance GHC.Show.Show Net.OpNetSpec
+instance Torch.NN.Parameterized Net.OpNet
+instance GHC.Show.Show Net.OpNet
+instance GHC.Generics.Generic Net.OpNet
+instance Torch.NN.Randomizable Net.OpNetSpec Net.OpNet
 
 
 -- | A module for storing Tabular Data as Tensors
@@ -189,89 +275,6 @@ instance GHC.Base.Functor Data.Frame.DataFrame
 
 
 -- | Hyper Parameters of OpNet
-module Torch.Extensions
-
--- | <tt>pow</tt> the other way around
-pow' :: Float -> Tensor -> Tensor
-
--- | The inverse of <tt>log10</tt>
-pow10 :: Tensor -> Tensor
-
-
--- | Neural Network Definition and Training
-module Net
-
--- | GPU
-gpu :: Device
-
--- | CPU
-cpu :: Device
-
--- | Neural Network Specification
-data OpNetSpec
-OpNetSpec :: Int -> Int -> OpNetSpec
-
--- | Number of input neurons
-[numX] :: OpNetSpec -> Int
-
--- | Number of output neurons
-[numY] :: OpNetSpec -> Int
-
--- | Network Architecture
-data OpNet
-OpNet :: Linear -> Linear -> Linear -> Linear -> Linear -> Linear -> Linear -> OpNet
-[fc0] :: OpNet -> Linear
-[fc1] :: OpNet -> Linear
-[fc2] :: OpNet -> Linear
-[fc3] :: OpNet -> Linear
-[fc4] :: OpNet -> Linear
-[fc5] :: OpNet -> Linear
-[fc6] :: OpNet -> Linear
-
--- | Neural Network Forward Pass
-forward :: OpNet -> Tensor -> Tensor
-
--- | Scale data to [0;1]
-scale :: Tensor -> Tensor -> Tensor -> Tensor
-
--- | Un-Scale data from [0;1]
-scale' :: Tensor -> Tensor -> Tensor -> Tensor
-
--- | Transform Masked Data
-trafo :: Tensor -> Tensor -> Tensor
-
--- | Inverse Transform Masked Data
-trafo' :: Tensor -> Tensor -> Tensor
-
--- | Remove Gradient for tracing / scripting
-noGrad :: Parameterized f => f -> IO f
-
--- | Wrapper for Network predictions including scaling and transformation
-predictor :: Tensor -> Tensor -> Tensor -> Tensor -> Tensor -> Tensor -> OpNet -> Tensor -> Tensor
-
--- | Save Model and Optimizer Checkpoint
-saveCheckPoint :: FilePath -> OpNet -> Adam -> IO ()
-
--- | Load a Saved Model and Optimizer CheckPoint
-loadCheckPoint :: FilePath -> Int -> Int -> Int -> IO (OpNet, Adam)
-
--- | Trace and Return a Script Module
-traceModel :: Device -> PDK -> Int -> (Tensor -> Tensor) -> IO ScriptModule
-
--- | Save a Traced ScriptModule
-saveInferenceModel :: FilePath -> ScriptModule -> IO ()
-
--- | Load a Traced ScriptModule
-loadInferenceModel :: FilePath -> IO ScriptModule
-instance GHC.Classes.Eq Net.OpNetSpec
-instance GHC.Show.Show Net.OpNetSpec
-instance Torch.NN.Parameterized Net.OpNet
-instance GHC.Show.Show Net.OpNet
-instance GHC.Generics.Generic Net.OpNet
-instance Torch.NN.Randomizable Net.OpNetSpec Net.OpNet
-
-
--- | Hyper Parameters of OpNet
 module HyperParameters
 
 -- | First gradient momentum estimate, default = 0.9
@@ -289,12 +292,6 @@ module Run
 
 -- | Filter Datapoints not in saturation
 satMask :: Device -> DataFrame Tensor -> Tensor
-
--- | Scale and transform a Tensor
-process' :: Tensor -> Tensor -> Tensor -> Tensor -> Tensor
-
--- | Scale and transform a DataFrame
-process :: Tensor -> Tensor -> Tensor -> DataFrame Tensor -> DataFrame Tensor
 
 -- | Run one Update Step
 trainStep :: Tensor -> Tensor -> OpNet -> Adam -> IO (OpNet, Adam, Tensor)
