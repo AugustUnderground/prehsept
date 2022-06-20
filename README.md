@@ -51,9 +51,17 @@ Available options:
   -h,--help                Show this help text
 ```
 
-## Example Notebooks
+## Notebooks
 
-soon.
+The notebooks can be viewed locally by running the jupyter server in the
+`./notebooks` directory:
+
+```bash
+$ stack exec jupyter -- notebook
+```
+
+[IHaskell](https://github.com/IHaskell/IHaskell) must be installed for this to
+work.
 
 ## License
 
@@ -61,5 +69,4 @@ BSD3
 
 ## Thanks
 
-Thanks to the [hastorch](https://github.com/hasktorch/hasktorch) project and
-the stack [sekelton](https://github.com/hasktorch/hasktorch-stack-skeleton)!
+Thanks to the [hastorch](https://github.com/hasktorch/hasktorch) project!
