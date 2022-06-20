@@ -119,6 +119,9 @@ currentTimeStamp' :: IO String
 -- | Create a model archive directory for the given pdk and device type
 createModelDir :: String -> String -> IO String
 
+-- | Just for the notebooks, to create a directory above
+createModelDir' :: String -> String -> IO String
+
 -- | Command Line Arguments
 data Args
 Args :: PDK -> Device -> FilePath -> Int -> Int -> Args
