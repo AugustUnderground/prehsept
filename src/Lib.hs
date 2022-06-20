@@ -184,6 +184,15 @@ createModelDir pdk' dev' = do
   where
     path' = "./models/" ++ pdk' ++ "/" ++ dev' ++ "-"
 
+-- | Just for the notebooks, to create a directory above
+createModelDir' :: String -> String -> IO String
+createModelDir' pdk' dev' = do
+    path <- (path' ++) <$> currentTimeStamp'
+    createDirectoryIfMissing True path
+    pure path
+  where
+    path' = "../models/" ++ pdk' ++ "/" ++ dev' ++ "-"
+
 ------------------------------------------------------------------------------
 -- Command Line Argument Parser
 ------------------------------------------------------------------------------
