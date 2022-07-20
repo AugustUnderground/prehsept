@@ -43,8 +43,8 @@ fromFile' cols path = do
     pure $ DataFrame cols vals
 
 -- | Load Tensor from file and construct DataFrame with default Header
-fromFile :: PDK -> FilePath -> IO (DataFrame T.Tensor)
-fromFile pdk' = fromFile' (columnHeader pdk')
+fromFile :: FilePath -> IO (DataFrame T.Tensor)
+fromFile = fromFile' columnHeader -- (columnHeader pdk')
 
 -- | Look up columns
 lookup :: [String] -> DataFrame T.Tensor -> DataFrame T.Tensor

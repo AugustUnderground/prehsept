@@ -24,11 +24,13 @@ satMask :: Device -> DataFrame T.Tensor -> T.Tensor
 satMask NMOS df = T.logicalAnd ((df ?? "Vgs") `T.gt` (df ?? "vth"))
                 . T.logicalAnd ((df ?? "Vds") `T.gt` 
                         ((df ?? "Vgs") - (df ?? "vth")))
-                $ (0.0 `T.lt` ((df ?? "Vgs") - (df ?? "vth")))
+                . T.logicalAnd (0.0 `T.lt` ((df ?? "Vgs") - (df ?? "vth")))
+                $ ((df ?? "region") `T.gt` 0)
 satMask PMOS df = T.logicalAnd (T.abs (df ?? "Vgs") `T.gt` T.abs (df ?? "vth"))
                 . T.logicalAnd (T.abs (df ?? "Vds") `T.gt` 
                         (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
-                $ (0.0 `T.lt` (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
+                . T.logicalAnd (0.0 `T.lt` (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
+                $ ((df ?? "region") `T.gt` 0)
 
 ------------------------------------------------------------------------------
 -- Training
@@ -111,13 +113,12 @@ runEpochs path epoch trainXs validXs trainYs validYs net opt = do
     epoch' = epoch - 1
 
 -- | Initiate Training Run for given Args
-run :: Args 
-      -> IO ()
+run :: Args -> IO ()
 run Args{..} = do
     putStrLn $ "Training " ++ show dev ++ " Model in " ++ show pdk ++ "."
 
     modelPath  <- createModelDir pdk' dev'
-    dfRaw      <- DF.fromFile pdk dir
+    dfRaw      <- DF.fromFile dir
 
     let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "M0.m1:gmoverid"
                                  , T.abs $  dfRaw ?? "M0.m1:fug"
@@ -130,7 +131,7 @@ run Args{..} = do
                                  ,          dfRaw ?? "M0.m1:vth"
                                  ,          dfRaw ?? "M0.m1:id"
                                  ,          dfRaw ?? "W"
-                                 ]
+                                 ,          dfRaw ?? "M0.m1:region" ]
         dfRaw' = DF.dropNan $ DataFrame cols vals
 
     let sat    = satMask dev dfRaw'
@@ -191,7 +192,7 @@ run Args{..} = do
     testSplit  = 0.8
     paramsX    = ["gmoverid", "fug", "Vds", "Vbs"]
     paramsY    = ["idoverw", "L", "gdsoverw", "Vgs"]
-    cols       = paramsX ++ paramsY ++ ["vth", "id", "W"]
+    cols       = paramsX ++ paramsY ++ ["vth", "id", "W", "region"]
     numInputs  = length paramsX
     numOutputs = length paramsY
     maskX      = boolMask' ["fug"] paramsX
