@@ -126,17 +126,17 @@ trafo' xMask x = T.where' xMask (T.pow10 x) x
 
 -- | Default Column Names for stored Tensors
 columnHeader :: [String]
-columnHeader = [ "vg", "W", "L", "M", "temp", "M0.m1:region", "M0.m1:vgs"
-               , "M0.m1:vds", "M0.m1:vbs", "M0.m1:vth", "M0.m1:vdsat"
-               , "M0.m1:gm", "M0.m1:gds", "M0.m1:gmbs", "M0.m1:betaeff"
-               , "M0.m1:cgg", "M0.m1:cgd", "M0.m1:cgs", "M0.m1:cgb"
-               , "M0.m1:cdg", "M0.m1:cdd", "M0.m1:cds", "M0.m1:cdb"
-               , "M0.m1:csg", "M0.m1:csd", "M0.m1:css", "M0.m1:csb"
-               , "M0.m1:cbg", "M0.m1:cbd", "M0.m1:cbs", "M0.m1:cbb"
-               , "M0.m1:ron", "M0.m1:id", "M0.m1:pwr", "M0.m1:gmoverid"
-               , "M0.m1:self_gain", "M0.m1:rout", "M0.m1:fug"
-               , "M0.m1:vearly", "D", "G", "S", "B", "VB:p", "VD:p"
-               , "VG:p", "VS:p" ]
+columnHeader = [ "vg", "W", "L", "M", "temp"
+               , "pwr", "region"
+               , "vgs", "vds", "vbs", "vth", "vdsat"
+               , "gm", "gds", "gmbs", "betaeff"
+               , "cgg", "cgd", "cgs", "cgb"
+               , "cdg", "cdd", "cds", "cdb"
+               , "csg", "csd", "css", "csb"
+               , "cbg", "cbd", "cbs", "cbb"
+               , "ron", "id", "gmoverid", "self_gain"
+               , "rout", "fug", "vearly"
+               , "D", "G", "S", "B", "VB:p", "VD:p", "VG:p", "VS:p" ]
 
 -- columnHeader :: PDK -> [String]
 -- columnHeader XH035 = [ "vg", "W", "L", "M", "temp", "M0.m1:region", "M0.m1:vgs"

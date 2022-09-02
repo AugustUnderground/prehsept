@@ -120,18 +120,18 @@ run Args{..} = do
     modelPath  <- createModelDir pdk' dev'
     dfRaw      <- DF.fromFile dir
 
-    let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "M0.m1:gmoverid"
-                                 , T.abs $  dfRaw ?? "M0.m1:fug"
-                                 ,          dfRaw ?? "M0.m1:vds"
-                                 ,          dfRaw ?? "M0.m1:vbs"
-                                 , T.abs $ (dfRaw ?? "M0.m1:id")  / (dfRaw ?? "W")
+    let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "gmoverid"
+                                 , T.abs $  dfRaw ?? "fug"
+                                 ,          dfRaw ?? "vds"
+                                 ,          dfRaw ?? "vbs"
+                                 , T.abs $ (dfRaw ?? "id")  / (dfRaw ?? "W")
                                  ,          dfRaw ?? "L"
-                                 , T.abs $ (dfRaw ?? "M0.m1:gds") / (dfRaw ?? "W")
-                                 ,          dfRaw ?? "M0.m1:vgs"
-                                 ,          dfRaw ?? "M0.m1:vth"
-                                 ,          dfRaw ?? "M0.m1:id"
+                                 , T.abs $ (dfRaw ?? "gds") / (dfRaw ?? "W")
+                                 ,          dfRaw ?? "vgs"
+                                 ,          dfRaw ?? "vth"
+                                 ,          dfRaw ?? "id"
                                  ,          dfRaw ?? "W"
-                                 ,          dfRaw ?? "M0.m1:region" ]
+                                 ,          dfRaw ?? "region" ]
         dfRaw' = DF.dropNan $ DataFrame cols vals
 
     let sat    = satMask dev dfRaw'
