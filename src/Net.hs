@@ -1,13 +1,11 @@
 {-# OPTIONS_GHC -Wall #-}
 
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Neural Network Definition and Training
@@ -15,8 +13,9 @@ module Net where
 
 import           Lib
 import           GHC.Generics
-import qualified Torch        as T
-import qualified Torch.NN     as NN
+import qualified Torch            as T
+import qualified Torch.Extensions as T
+import qualified Torch.NN         as NN
 
 ------------------------------------------------------------------------------
 -- Neural Network
@@ -64,9 +63,11 @@ forward OpNet{..} = T.linear fc6 . T.relu
 -- | Remove Gradient for tracing / scripting
 noGrad :: (NN.Parameterized f) => f -> IO f
 noGrad net = do
-    params  <- mapM (T.detach . T.toDependent) $ NN.flattenParameters net
-    params' <- mapM (`T.makeIndependentWithRequiresGrad` False) params
-    pure $ NN.replaceParameters net params'
+    params <- mapM detachToCPU (NN.flattenParameters net) 
+                >>= mapM (`T.makeIndependentWithRequiresGrad` False)
+    pure $ NN.replaceParameters net params
+  where
+    detachToCPU = T.detach . T.toDevice T.cpu . T.toDependent
 
 ------------------------------------------------------------------------------
 -- Saving and Loading

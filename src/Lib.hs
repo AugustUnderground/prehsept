@@ -26,7 +26,8 @@ data PDK = XH035    -- ^ X-Fab XH035 350nm Process
          | XH018    -- ^ X-Fab XH018 180nm Process
          | XT018    -- ^ X-Fab XT018 180nm Process
          | GPDK180  -- ^ Fictional Cadence GPDK180 GPDK 180nm Process
-         | GPDK90   -- ^ Fictional Cadence GPDK90 GPDK 90nm Process
+         | GPDK090  -- ^ Fictional Cadence GPDK090 GPDK 90nm Process
+         | GPDK045  -- ^ Fictional Cadence GPDK045 GPDK 45nm Process
          | SKY130   -- ^ SkyWater SKY130 130nm Process
          | PTM130   -- ^ Fictional Predictive Technology Models PTM130 130nm Process
     deriving (Eq)
@@ -36,7 +37,8 @@ instance Show PDK where
   show XH018   = "xh018"
   show XT018   = "xt018"
   show GPDK180 = "gpdk180"
-  show GPDK90  = "gpdk90"
+  show GPDK090 = "gpdk090"
+  show GPDK045 = "gpdk045"
   show SKY130  = "sky130"
   show PTM130  = "ptm130"
 
@@ -45,7 +47,8 @@ instance Read PDK where
   readsPrec _ "xh018"   = [(XH018, "")]
   readsPrec _ "xt018"   = [(XT018, "")]
   readsPrec _ "gpdk180" = [(GPDK180, "")]
-  readsPrec _ "gpdk90"  = [(GPDK90, "")]
+  readsPrec _ "gpdk090" = [(GPDK090, "")]
+  readsPrec _ "gpdk045" = [(GPDK045, "")]
   readsPrec _ "sky130"  = [(SKY130, "")]
   readsPrec _ "ptm130"  = [(PTM130, "")]
   readsPrec _ _         = undefined

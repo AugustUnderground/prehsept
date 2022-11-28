@@ -173,7 +173,9 @@ run Args{..} = do
 
     saveCheckPoint modelPath net' opt'
 
-    !net'' <- T.toDevice T.cpu <$> noGrad net'
+    -- !net'' <- T.toDevice T.cpu <$> noGrad net'
+    !net'' <- loadCheckPoint modelPath (OpNetSpec numInputs numOutputs) num 
+                >>= noGrad . fst
 
     let tracePath = modelPath ++ "/trace.pt"
         predict   = trafo' maskY
@@ -195,5 +197,5 @@ run Args{..} = do
     cols       = paramsX ++ paramsY ++ ["vth", "id", "W", "region"]
     numInputs  = length paramsX
     numOutputs = length paramsY
-    maskX      = boolMask' ["fug"] paramsX
-    maskY      = boolMask' ["idoverw", "gdsoverw"] paramsY
+    maskX      = T.toDevice T.cpu $ boolMask' ["fug"] paramsX
+    maskY      = T.toDevice T.cpu $ boolMask' ["idoverw", "gdsoverw"] paramsY
