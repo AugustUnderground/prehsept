@@ -11,7 +11,7 @@ apply-ghc-options: locals
 
 extra-deps:
   - git: https://github.com/hasktorch/hasktorch.git
-    commit: 5f97cd3fa1647092de85e4675aebdc3da1967098
+    commit: d77e48c6ab7b356c0ad480f00b9092cb49f5a37f
     subdirs:
       - hasktorch
       - libtorch-ffi
