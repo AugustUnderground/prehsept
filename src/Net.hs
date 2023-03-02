@@ -63,11 +63,11 @@ forward OpNet{..} = T.linear fc6 . T.relu
 -- | Remove Gradient for tracing / scripting
 noGrad :: (NN.Parameterized f) => f -> IO f
 noGrad net = do
-    params <- mapM detachToCPU (NN.flattenParameters net) 
-                >>= mapM (`T.makeIndependentWithRequiresGrad` False)
+    params <- mapM ((`T.makeIndependentWithRequiresGrad` False) . detachToCPU)
+            $ NN.flattenParameters net
     pure $ NN.replaceParameters net params
   where
-    detachToCPU = T.detach . T.toDevice T.cpu . T.toDependent
+    detachToCPU = T.toDevice T.cpu . T.toDependent
 
 ------------------------------------------------------------------------------
 -- Saving and Loading
@@ -95,7 +95,7 @@ traceModel :: Device -> PDK -> Int -> (T.Tensor -> T.Tensor)
 traceModel dev pdk num predict = do
         T.trace name "forward" fun data' >>= T.toScriptModule
   where
-    fun   = mapM (T.detach . predict)
+    fun   = pure . map predict -- mapM (T.detach . predict)
     name  = show pdk ++ "_" ++ show dev
     data' = [T.ones' [1, num]]
 

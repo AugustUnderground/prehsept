@@ -25,11 +25,13 @@ satMask NMOS df = T.logicalAnd ((df ?? "Vgs") `T.gt` (df ?? "vth"))
                 . T.logicalAnd ((df ?? "Vds") `T.gt` 
                         ((df ?? "Vgs") - (df ?? "vth")))
                 . T.logicalAnd (0.0 `T.lt` ((df ?? "Vgs") - (df ?? "vth")))
+                -- . T.logicalAnd (T.isclose 1.0e-03 2.0e-2 True (df ?? "Vds") (df ?? "Vgs"))
                 $ ((df ?? "region") `T.gt` 0)
 satMask PMOS df = T.logicalAnd (T.abs (df ?? "Vgs") `T.gt` T.abs (df ?? "vth"))
                 . T.logicalAnd (T.abs (df ?? "Vds") `T.gt` 
                         (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
                 . T.logicalAnd (0.0 `T.lt` (T.abs (df ?? "Vgs") - T.abs (df ?? "vth")))
+                -- . T.logicalAnd (T.isclose 1.0e-03 2.0e-2 True (df ?? "Vds") (df ?? "Vgs"))
                 $ ((df ?? "region") `T.gt` 0)
 
 ------------------------------------------------------------------------------
@@ -45,6 +47,7 @@ trainStep trueX trueY net opt = do
   where
     predY = forward net trueX
     loss  = T.mseLoss trueY predY
+    -- loss  = T.smoothL1Loss T.ReduceMean trueY predY
 
 -- | Run through all Batches performing an update for each
 trainingEpoch :: ProgressBar s -> [T.Tensor]  -> [T.Tensor] -> [T.Tensor] 
@@ -97,14 +100,14 @@ runEpochs path 0     _       _       _       _       net opt = do
 runEpochs path epoch trainXs validXs trainYs validYs net opt = do
 
     tBar <- newProgressBar (trainStyle epoch) 10 (Progress 0 (length trainXs) ())
-    (net', opt', mse) <- trainingEpoch tBar trainXs trainYs [] net opt
+    (net', opt', lss) <- trainingEpoch tBar trainXs trainYs [] net opt
 
-    putStrLn $ "\tTraining Loss: " ++ show (T.mean mse)
+    putStrLn $ "\tTraining Loss: " ++ show (T.asValue $ T.mean lss :: Float)
 
     vBar <- newProgressBar (validStyle epoch) 10 (Progress 0 (length validXs) ())
     mae  <- validationEpoch vBar validXs validYs net' []
     
-    putStrLn $ "\tValidataion Loss: " ++ show (T.mean mae)
+    putStrLn $ "\tValidataion Loss: " ++ show (T.asValue $ T.mean mae :: Float)
 
     saveCheckPoint path net' opt'
 
@@ -120,17 +123,28 @@ run Args{..} = do
     modelPath  <- createModelDir pdk' dev'
     dfRaw      <- DF.fromFile dir
 
+    -- let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "gmoverid"
+    --                              , T.abs $  dfRaw ?? "fug"
+    --                              ,          dfRaw ?? "vds"
+    --                              ,          dfRaw ?? "vbs"
+    --                              , T.abs $ (dfRaw ?? "id")  / (dfRaw ?? "W")
+    --                              ,          dfRaw ?? "L"
+    --                              , T.abs $ (dfRaw ?? "gds") / (dfRaw ?? "W")
+    --                              ,          dfRaw ?? "vgs"
+    --                              ,          dfRaw ?? "vth"
+    --                              ,          dfRaw ?? "id"
+    --                              ,          dfRaw ?? "W"
+    --                              ,          dfRaw ?? "region" ]
     let vals   = T.cat (T.Dim 1) [ T.abs $  dfRaw ?? "gmoverid"
+                                 ,          dfRaw ?? "self_gain"
                                  , T.abs $  dfRaw ?? "fug"
-                                 ,          dfRaw ?? "vds"
+                                 , T.abs $  dfRaw ?? "id"
+                                 , T.abs $  dfRaw ?? "vds"
                                  ,          dfRaw ?? "vbs"
-                                 , T.abs $ (dfRaw ?? "id")  / (dfRaw ?? "W")
-                                 ,          dfRaw ?? "L"
-                                 , T.abs $ (dfRaw ?? "gds") / (dfRaw ?? "W")
-                                 ,          dfRaw ?? "vgs"
-                                 ,          dfRaw ?? "vth"
-                                 ,          dfRaw ?? "id"
                                  ,          dfRaw ?? "W"
+                                 ,          dfRaw ?? "L"
+                                 , T.abs $  dfRaw ?? "vgs"
+                                 ,          dfRaw ?? "vth"
                                  ,          dfRaw ?? "region" ]
         dfRaw' = DF.dropNan $ DataFrame cols vals
 
@@ -192,10 +206,14 @@ run Args{..} = do
     pdk'       = show pdk
     dev'       = show dev
     testSplit  = 0.8
-    paramsX    = ["gmoverid", "fug", "Vds", "Vbs"]
-    paramsY    = ["idoverw", "L", "gdsoverw", "Vgs"]
-    cols       = paramsX ++ paramsY ++ ["vth", "id", "W", "region"]
+    -- paramsX    = ["gmoverid", "fug", "Vds", "Vbs"]
+    -- paramsY    = ["idoverw", "L", "gdsoverw", "Vgs"]
+    -- cols       = paramsX ++ paramsY ++ ["vth", "id", "W", "region"]
+    paramsX    = ["gmoverid", "self_gain", "fug", "id", "Vds", "Vbs"]
+    paramsY    = ["W", "L"]
+    cols       = paramsX ++ paramsY ++ ["Vgs", "vth", "region"]
     numInputs  = length paramsX
     numOutputs = length paramsY
-    maskX      = T.toDevice T.cpu $ boolMask' ["fug"] paramsX
-    maskY      = T.toDevice T.cpu $ boolMask' ["idoverw", "gdsoverw"] paramsY
+    maskX      = T.toDevice T.cpu $ boolMask' ["self_gain", "fug", "id"] paramsX
+    maskY      = T.toDevice T.cpu $ T.asTensor ([False, False] :: [Bool])
+    -- maskY      = T.toDevice T.cpu $ boolMask' ["idoverw", "gdsoverw"] paramsY

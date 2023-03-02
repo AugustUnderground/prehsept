@@ -81,6 +81,10 @@ fst3 (a,_,_) = a
 uncurry' :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry' f (a,b,c) = f a b c
 
+-- | Create single element list from given element
+singleton :: a -> [a]
+singleton x = [x]
+
 -- | Create a boolean mask from a subset of column names
 boolMask :: [String] -> [String] -> [Bool]
 boolMask sub = map (`elem` sub)
