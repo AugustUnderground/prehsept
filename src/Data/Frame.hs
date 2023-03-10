@@ -54,6 +54,7 @@ lookup cols DataFrame{..} = DataFrame cols vals
     vals = T.indexSelect' 1 idx values
 
 -- | Shorthand for looking up a single key
+infixr 5 ??
 (??) :: DataFrame T.Tensor -> String -> T.Tensor
 (??) df key = values $ lookup [key] df
 

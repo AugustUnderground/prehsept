@@ -22,18 +22,18 @@ import qualified Torch.NN         as NN
 ------------------------------------------------------------------------------
 
 -- | Neural Network Specification
-data OpNetSpec = OpNetSpec { numX   :: Int       -- ^ Number of input neurons
-                           , numY   :: Int       -- ^ Number of output neurons
+data OpNetSpec = OpNetSpec { numX   :: !Int -- ^ Number of input neurons
+                           , numY   :: !Int -- ^ Number of output neurons
                            } deriving (Show, Eq)
 
 -- | Network Architecture
-data OpNet = OpNet { fc0 :: T.Linear
-                   , fc1 :: T.Linear
-                   , fc2 :: T.Linear
-                   , fc3 :: T.Linear
-                   , fc4 :: T.Linear
-                   , fc5 :: T.Linear
-                   , fc6 :: T.Linear
+data OpNet = OpNet { fc0 :: !T.Linear
+                   , fc1 :: !T.Linear
+                   , fc2 :: !T.Linear
+                   , fc3 :: !T.Linear
+                   , fc4 :: !T.Linear
+                   , fc5 :: !T.Linear
+                   , fc6 :: !T.Linear
                    } deriving (Generic, Show, T.Parameterized)
 
 -- | Neural Network Weight initialization
@@ -55,7 +55,6 @@ forward OpNet{..} = T.linear fc6 . T.relu
                   . T.linear fc2 . T.relu
                   . T.linear fc1 . T.relu
                   . T.linear fc0 
-
 ------------------------------------------------------------------------------
 -- Serialization
 ------------------------------------------------------------------------------

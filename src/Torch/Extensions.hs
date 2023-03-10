@@ -10,7 +10,7 @@ module Torch.Extensions where
 
 import           GHC.Float                       (float2Double)
 import qualified Torch                     as T
-import qualified Torch.Functional.Internal as T (nan_to_num, powScalar')
+import qualified Torch.Functional.Internal as T (nan_to_num, powScalar', mse_loss)
 
 ------------------------------------------------------------------------------
 -- Convenience / Syntactic Sugar
@@ -51,3 +51,9 @@ nanToNum'' self = T.nan_to_num self nan posinf neginf
     nan    = 0.0 :: Double
     posinf = 0.0 :: Double
     neginf = 0.0 :: Double
+
+-- | MSE with reduction
+mseLoss' :: T.Reduction -> T.Tensor -> T.Tensor -> T.Tensor
+mseLoss' T.ReduceNone x y = T.mse_loss x y 0
+mseLoss' T.ReduceMean x y = T.mse_loss x y 1
+mseLoss' T.ReduceSum  x y = T.mse_loss x y 2

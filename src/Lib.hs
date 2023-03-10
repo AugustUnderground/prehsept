@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 {-# LANGUAGE StrictData #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 
@@ -108,6 +109,16 @@ round :: Int -> T.Tensor -> T.Tensor
 round digits = (* (1 / d)) . T.ceil . (* d)
   where
     d = T.asTensor $ 10 ** (realToFrac digits :: Float)
+
+-- | (Re-) Shuffle batches
+shuffleBatches :: Int -> T.Tensor -> T.Tensor -> IO ([T.Tensor], [T.Tensor])
+shuffleBatches s x y = do
+    idx <- T.multinomialIO (T.asTensor @[Float] [ 0 .. realToFrac n - 1]) n False
+    let x' = T.split s (T.Dim 0) . T.toDevice T.gpu $ T.indexSelect 0 idx x
+        y' = T.split s (T.Dim 0) . T.toDevice T.gpu $ T.indexSelect 0 idx y
+    pure (x', y')
+  where
+    n = head $ T.shape x
 
 ------------------------------------------------------------------------------
 -- Scaling and Transforming

@@ -18,5 +18,5 @@ import qualified Torch.Extensions as T
 β2 = 0.999
 -- | Learning Rate
 α :: T.Tensor
-α  = T.asTensor' (0.001 :: Float) 
+α  = T.asTensor' (1.0e-3 :: Float) 
    . T.withDType T.Float . T.withDevice T.gpu $ T.defaultOpts
