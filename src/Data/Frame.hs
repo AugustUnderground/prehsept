@@ -16,8 +16,8 @@ import qualified Torch.Functional.Internal as T        (isinf, argsort)
 ------------------------------------------------------------------------------
 
 -- | Data Frame
-data DataFrame a = DataFrame { columns :: [String] -- ^ Unique Column Identifier
-                             , values  :: a        -- ^ Data
+data DataFrame a = DataFrame { columns :: ![String] -- ^ Unique Column Identifier
+                             , values  :: !a        -- ^ Data
                              } deriving (Show)
 
 -- | Functor instance for Mapping over values
