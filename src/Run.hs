@@ -16,35 +16,6 @@ import qualified Torch.Extensions   as T
 import qualified Torch.NN           as NN
 
 ------------------------------------------------------------------------------
--- Utility and Helpers
-------------------------------------------------------------------------------
-
--- | Filter Datapoints not in saturation
-selMask :: Device -> DataFrame T.Tensor -> T.Tensor
-selMask NMOS df = (df ?? "region") `T.eq` 2
-                --   T.logicalAnd (5.0 `T.lt` (df ?? "gmoverid"))
-                -- . T.logicalAnd (25.0 `T.gt` (df ?? "gmoverid"))
-                -- T.logicalAnd (5.0e-6 `T.lt` (df ?? "W")) . T.logicalAnd (10.0e-6 `T.gt` (df ?? "W"))
-                -- T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs")) $
-                --   T.logicalAnd ((df ?? "Vgs") `T.gt` (df ?? "vth"))
-                -- . T.logicalAnd ((df ?? "Vds") `T.gt` ((df ?? "Vgs") - (df ?? "vth")))
-                -- . T.logicalAnd (0.0 `T.lt` T.abs ((df ?? "Vgs") - (df ?? "vth")))
-                --  $ T.isclose 1.0e-06 1.0e-6 False (df ?? "W") (T.asTensor @Float 15.0e-06)
-                -- (`T.eq` 2) . (?? "region") 
-selMask PMOS df = (df ?? "region") `T.eq` 2
-                --   T.logicalAnd (5.0 `T.lt` (df ?? "gmoverid"))
-                -- . T.logicalAnd (25.0 `T.gt` (df ?? "gmoverid"))
-               -- T.logicalAnd (5.0e-6 `T.lt` (df ?? "W")) . T.logicalAnd (10.0e-6 `T.gt` (df ?? "W"))
-               -- T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs")) $
-               --   T.logicalAnd ((df ?? "Vgs") `T.lt` (df ?? "vth"))
-               -- . T.logicalAnd ((df ?? "Vds") `T.lt` ((df ?? "Vgs") - (df ?? "vth")))
-               -- . T.logicalAnd (0.0 `T.lt` T.abs ((df ?? "Vgs") - (df ?? "vth")))
-               -- . T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs"))
-               -- . T.logicalAnd (5.0 `T.lt` (df ?? "gmoverid")) . T.logicalAnd (25.0 `T.gt` (df ?? "gmoverid"))
-               --  $ T.isclose 1.0e-06 1.0e-6 False (df ?? "W") (T.asTensor @Float 15.0e-06)
-               -- (`T.eq` 2) . (?? "region") 
-
-------------------------------------------------------------------------------
 -- Training
 ------------------------------------------------------------------------------
 
@@ -145,13 +116,8 @@ run Args{..} = do
         dfRaw' = DF.dropNan $ DataFrame cols vals
 
     let sat    = T.eq (dfRaw' ?? "region") 2
-        -- sat'   = T.logicalAnd sat $ (dfRaw' ?? "gmoverid") `T.gt` 10.0
-        -- sat''  = T.logicalAnd sat $ (dfRaw' ?? "gmoverid") `T.lt` 10.0
-        -- nSat'  = head . T.shape . T.nonzero $ sat'
         dfSat  = rowFilter sat dfRaw'
 
-    -- dfSat'     <- DF.sampleIO nSat' False $ rowFilter sat'' dfRaw'
-    -- dfShuff    <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
     dfShuff    <- DF.shuffleIO dfSat
 
     let dfT    = DF.dropNan 
@@ -193,14 +159,14 @@ run Args{..} = do
                  . scale minX maxX . trafo maskX $ x'
             !w   = T.reshape [-1,1] $ T.select 1 0 x / T.select 1 0 y'
             !l   = T.reshape [-1,1] $ T.select 1 1 y'
-            !y   = T.cat (T.Dim 1) [ w, l ]
+            !y   = T.abs $ T.cat (T.Dim 1) [ w, l ]
 
     traceModel dev pdk num' predict >>= saveInferenceModel tracePath
 
     putStrLn $ "Final Checkpoint saved at: " ++ modelPath
     putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    -- testModel dfRaw' ("id" : paramsX) paramsY predict
+    testModel dfRaw' ("id" : paramsX) paramsY predict
   where
     pdk'       = show pdk
     dev'       = show dev
