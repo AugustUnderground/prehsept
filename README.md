@@ -51,6 +51,13 @@ Available options:
   -h,--help                Show this help text
 ```
 
+For example, to train a GPDK180 NMOS model for 100 epochs with a batch size of
+32 run:
+
+```bash
+stack exec -- prehsept-exe --pdk gpdk180 --dev nmos --dir ./data/gpdk180-pmos.pt --size 32 --num 100
+```
+
 ## Notebooks
 
 The notebooks can be viewed locally by running the jupyter server in the
