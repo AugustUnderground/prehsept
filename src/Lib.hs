@@ -140,6 +140,12 @@ trafo xMask x = T.where' xMask (T.log10 $ T.abs x) x
 trafo' :: T.Tensor -> T.Tensor -> T.Tensor
 trafo' xMask x = T.where' xMask (T.pow10 x) x
 
+-- | calculate gm from gm/Id and Id, input is [gm/Id, Id, fug, Vds, Vbs]
+process :: T.Tensor -> T.Tensor
+process x = T.cat (T.Dim 1) [ gm, x ]
+  where
+    gm = T.reshape [-1, 1] $ T.select 1 0 x * T.select 1 1 x
+
 ------------------------------------------------------------------------------
 -- Saving and Loading Tensors
 ------------------------------------------------------------------------------

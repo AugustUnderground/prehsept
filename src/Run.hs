@@ -2,7 +2,6 @@
 
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 
 -- | Module for running training
 module Run where
@@ -11,11 +10,10 @@ import           System.ProgressBar
 import           Lib
 import           Net
 import           HyperParameters
-import           Data.Frame                as DF
-import qualified Torch                     as T
-import qualified Torch.Extensions          as T
--- import qualified Torch.Functional.Internal as T (eqScalar)
-import qualified Torch.NN                  as NN
+import           Data.Frame         as DF
+import qualified Torch              as T
+import qualified Torch.Extensions   as T
+import qualified Torch.NN           as NN
 
 ------------------------------------------------------------------------------
 -- Utility and Helpers
@@ -23,20 +21,28 @@ import qualified Torch.NN                  as NN
 
 -- | Filter Datapoints not in saturation
 selMask :: Device -> DataFrame T.Tensor -> T.Tensor
-selMask NMOS df = T.logicalAnd ((df ?? "Vgs") `T.gt` (df ?? "vth"))
-                . T.logicalAnd ((df ?? "Vds") `T.gt` ((df ?? "Vgs") - (df ?? "vth")))
-                . T.logicalAnd (0.0 `T.lt` T.abs ((df ?? "Vgs") - (df ?? "vth")))
-                -- . T.logicalAnd (T.isclose 1.0e-03 1.0e-2 False (df ?? "Vbs") (T.zerosLike (df ?? "Vbs")))
-                . T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs"))
-                . T.logicalAnd (T.isclose 1.0e-06 1.0e-6 False (df ?? "W") (T.asTensor @Float 15.0e-06))
-                $ ((df ?? "region") `T.eq` 2)
-selMask PMOS df = T.logicalAnd ((df ?? "Vgs") `T.lt` (df ?? "vth"))
-                . T.logicalAnd ((df ?? "Vds") `T.lt` ((df ?? "Vgs") - (df ?? "vth")))
-                . T.logicalAnd (0.0 `T.lt` T.abs ((df ?? "Vgs") - (df ?? "vth")))
-                -- . T.logicalAnd (T.isclose 1.0e-03 1.0e-2 False (df ?? "Vbs") (T.zerosLike (df ?? "Vbs")))
-                . T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs"))
-                . T.logicalAnd (T.isclose 1.0e-06 1.0e-6 False (df ?? "W") (T.asTensor @Float 15.0e-06))
-                $ ((df ?? "region") `T.eq` 2)
+selMask NMOS df = (df ?? "region") `T.eq` 2
+                --   T.logicalAnd (5.0 `T.lt` (df ?? "gmoverid"))
+                -- . T.logicalAnd (25.0 `T.gt` (df ?? "gmoverid"))
+                -- T.logicalAnd (5.0e-6 `T.lt` (df ?? "W")) . T.logicalAnd (10.0e-6 `T.gt` (df ?? "W"))
+                -- T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs")) $
+                --   T.logicalAnd ((df ?? "Vgs") `T.gt` (df ?? "vth"))
+                -- . T.logicalAnd ((df ?? "Vds") `T.gt` ((df ?? "Vgs") - (df ?? "vth")))
+                -- . T.logicalAnd (0.0 `T.lt` T.abs ((df ?? "Vgs") - (df ?? "vth")))
+                --  $ T.isclose 1.0e-06 1.0e-6 False (df ?? "W") (T.asTensor @Float 15.0e-06)
+                -- (`T.eq` 2) . (?? "region") 
+selMask PMOS df = (df ?? "region") `T.eq` 2
+                --   T.logicalAnd (5.0 `T.lt` (df ?? "gmoverid"))
+                -- . T.logicalAnd (25.0 `T.gt` (df ?? "gmoverid"))
+               -- T.logicalAnd (5.0e-6 `T.lt` (df ?? "W")) . T.logicalAnd (10.0e-6 `T.gt` (df ?? "W"))
+               -- T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs")) $
+               --   T.logicalAnd ((df ?? "Vgs") `T.lt` (df ?? "vth"))
+               -- . T.logicalAnd ((df ?? "Vds") `T.lt` ((df ?? "Vgs") - (df ?? "vth")))
+               -- . T.logicalAnd (0.0 `T.lt` T.abs ((df ?? "Vgs") - (df ?? "vth")))
+               -- . T.logicalAnd (T.isclose 1.0e-03 2.0e-2 False (df ?? "Vds") (df ?? "Vgs"))
+               -- . T.logicalAnd (5.0 `T.lt` (df ?? "gmoverid")) . T.logicalAnd (25.0 `T.gt` (df ?? "gmoverid"))
+               --  $ T.isclose 1.0e-06 1.0e-6 False (df ?? "W") (T.asTensor @Float 15.0e-06)
+               -- (`T.eq` 2) . (?? "region") 
 
 ------------------------------------------------------------------------------
 -- Training
@@ -51,7 +57,6 @@ trainStep trueX trueY net opt = do
   where
     predY = forward net trueX
     loss  = T.l1Loss T.ReduceSum trueY predY
-    -- loss  = T.smoothL1Loss T.ReduceMean trueY predY
 
 -- | Run through all Batches performing an update for each
 trainingEpoch :: ProgressBar s -> [T.Tensor]  -> [T.Tensor] -> [T.Tensor] 
@@ -129,32 +134,25 @@ run Args{..} = do
     modelPath  <- createModelDir pdk' dev'
     dfRaw      <- DF.fromFile dir
 
-    let vals   = T.cat (T.Dim 1) [ T.abs $ dfRaw ?? "gmoverid"
-                                 , T.abs $ dfRaw ?? "fug"
-                                 , T.abs $ dfRaw ?? "vds"
-                                 , T.abs $ dfRaw ?? "vbs"
-                                 ,         dfRaw ?? "vgs"
-                                 -- , T.abs $ dfRaw ?? "self_gain"
+    let vals   = T.cat (T.Dim 1) [         dfRaw ?? "gmoverid"
+                                 ,         dfRaw ?? "fug"
+                                 ,         dfRaw ?? "vds"
+                                 ,         dfRaw ?? "vbs"
                                  , T.abs $ (dfRaw ?? "id") / (dfRaw ?? "W")
                                  ,         dfRaw ?? "L"
-                                 ,         dfRaw ?? "W"
-                                 -- , T.abs $ (dfRaw ?? "W") * (dfRaw ?? "L")
-                                 -- , T.abs $ (dfRaw ?? "W") / (dfRaw ?? "L")
-                                 -- , T.abs $ (dfRaw ?? "gds") / (dfRaw ?? "W")
-                                 -- ,         dfRaw ?? "vdsat"
-                                 , T.abs $ dfRaw ?? "vth"
+                                 ,         dfRaw ?? "id"
                                  ,         dfRaw ?? "region" ]
         dfRaw' = DF.dropNan $ DataFrame cols vals
 
-    -- print . fst3 . T.uniqueDim 0 True False False $ dfRaw ?? "W"
-
-    let sat    = selMask dev dfRaw'
-        sat'   = T.logicalNot sat
-        nSat'  = (`div` 4) . head . T.shape . T.nonzero $ sat
+    let sat    = T.eq (dfRaw' ?? "region") 2
+        -- sat'   = T.logicalAnd sat $ (dfRaw' ?? "gmoverid") `T.gt` 10.0
+        -- sat''  = T.logicalAnd sat $ (dfRaw' ?? "gmoverid") `T.lt` 10.0
+        -- nSat'  = head . T.shape . T.nonzero $ sat'
         dfSat  = rowFilter sat dfRaw'
 
-    dfSat'     <- DF.sampleIO nSat' False $ rowFilter sat' dfRaw'
-    dfShuff    <- DF.shuffleIO (DF.concat [dfSat, dfSat'])
+    -- dfSat'     <- DF.sampleIO nSat' False $ rowFilter sat'' dfRaw'
+    -- dfShuff    <- DF.shuffleIO $ DF.concat [dfSat, dfSat']
+    dfShuff    <- DF.shuffleIO dfSat
 
     let dfT    = DF.dropNan 
                $ DF.union (trafo maskX <$> DF.lookup paramsX dfShuff)
@@ -186,24 +184,45 @@ run Args{..} = do
                     >>= noGrad . fst
 
     let tracePath = modelPath ++ "/" ++ dev' ++ ".pt"
-        predict   = trafo' maskY
-                  . scale' minY maxY
-                  . forward net''
-                  . scale minX maxX
-                  . trafo maskX
+        num'      = numInputs + 1
+        predict x = y
+          where
+            !i'  = T.arange 1 num' 1 . T.withDType T.Int64 $ T.defaultOpts 
+            !x'  = T.indexSelect 1 i' x
+            !y'  = trafo' maskY . scale' minY maxY . forward net''
+                 . scale minX maxX . trafo maskX $ x'
+            !w   = T.reshape [-1,1] $ T.select 1 0 x / T.select 1 0 y'
+            !l   = T.reshape [-1,1] $ T.select 1 1 y'
+            !y   = T.cat (T.Dim 1) [ w, l ]
+
+    traceModel dev pdk num' predict >>= saveInferenceModel tracePath
 
     putStrLn $ "Final Checkpoint saved at: " ++ modelPath
     putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    traceModel dev pdk numInputs predict >>= saveInferenceModel tracePath
+    -- testModel dfRaw' ("id" : paramsX) paramsY predict
   where
     pdk'       = show pdk
     dev'       = show dev
     testSplit  = 0.75
     paramsX    = ["gmoverid", "fug", "Vds", "Vbs"]
-    paramsY    = ["Vgs", "idoverW", "L"]
-    cols       = paramsX ++ paramsY ++ ["W", "vth", "region"]
+    paramsY    = ["idoverW", "L"]
+    cols       = paramsX ++ paramsY ++ ["id", "region"]
     numInputs  = length paramsX
     numOutputs = length paramsY
-    maskX      = T.toDevice T.cpu $ boolMask' ["fug"] paramsX
-    maskY      = T.toDevice T.cpu $ boolMask' ["idoverW"] paramsY
+    maskX      = T.toDevice T.cpu $ boolMask' ["gmoverid", "id", "fug"] paramsX
+    maskY      = T.toDevice T.cpu $ boolMask' ["idoverW", "L"] paramsY
+
+testModel :: DF.DataFrame T.Tensor -> [String] -> [String]
+          -> (T.Tensor -> T.Tensor) -> IO ()
+testModel df paramsX paramsY mdl = do
+    df' <- DF.sampleIO 10 False $ DF.rowFilter ((df ?? "region") `T.eq` 2) df
+    let x  = DF.lookup paramsX df'
+        y  = DF.DataFrame paramsY 
+           $ T.cat (T.Dim 1) [ T.abs $ (df' ?? "id") / (df' ?? "idoverW")
+                             , T.abs $ df' ?? "L" ]
+        y' = DF.DataFrame paramsY . mdl $ DF.values x
+    print x
+    print y
+    print y'
+    pure ()
