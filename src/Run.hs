@@ -166,7 +166,7 @@ run Args{..} = do
     putStrLn $ "Final Checkpoint saved at: " ++ modelPath
     putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    testModel dfRaw' ("id" : paramsX) paramsY predict
+    -- testModel dfRaw' ("id" : paramsX) paramsY predict
   where
     pdk'       = show pdk
     dev'       = show dev
