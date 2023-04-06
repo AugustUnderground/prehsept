@@ -39,15 +39,17 @@ The executable part supports the following arguments:
 Primitive Device Modeling Around the Operating Point
 
 Usage: prehsept-exe [-k|--pdk PDK] [-d|--dev DEV] (-p|--dir DIR) [-n|--num NUM]
-                    [-s|--size SIZE]
+                    [-r|--reg REGION] [-s|--size SIZE]
   PREHSEPT
 
 Available options:
-  -k,--pdk PDK             PDK from which the data was generated (default: xh035)
+  -k,--pdk PDK             PDK from which the data was generated
+                           (default: xh035)
   -d,--dev DEV             Device Type: nmos | pmos (default: nmos)
   -p,--dir DIR             Path to lookup-table as tensor
   -n,--num NUM             Number of Epochs (default: 25)
-  -s,--size SIZE           Batch Size (default: 25)
+  -r,--reg REGION          Region of Operation: 2 | 3 (default: 2)
+  -s,--size SIZE           Batch Size (default: 5000)
   -h,--help                Show this help text
 ```
 
