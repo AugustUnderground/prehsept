@@ -208,11 +208,12 @@ createModelDir' pdk' dev' = do
 ------------------------------------------------------------------------------
 
 -- | Command Line Arguments
-data Args = Args { pdk  :: PDK      -- ^ PDK
-                 , dev  :: Device   -- ^ NMOS | PMOS
-                 , dir  :: FilePath -- ^ Path to Data
-                 , num  :: Int      -- ^ Number of Epochs
-                 , size :: Int      -- ^ Batch Size
+data Args = Args { pdk  :: !PDK      -- ^ PDK
+                 , dev  :: !Device   -- ^ NMOS | PMOS
+                 , dir  :: !FilePath -- ^ Path to Data
+                 , num  :: !Int      -- ^ Number of Epochs
+                 , reg  :: !Int      -- ^ Area of Operation
+                 , size :: !Int      -- ^ Batch Size
                  } deriving (Show)
 
 ------------------------------------------------------------------------------

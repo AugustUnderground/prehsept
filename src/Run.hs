@@ -112,13 +112,14 @@ run Args{..} = do
                                  , T.abs $ (dfRaw ?? "id") / (dfRaw ?? "W")
                                  ,         dfRaw ?? "L"
                                  ,         dfRaw ?? "id"
-                                 ,         dfRaw ?? "region" ]
+                                 ,         dfRaw ?? "region" 
+                                 ,         dfRaw ?? "vth" 
+                                 ,         dfRaw ?? "vgs" ]
         dfRaw' = DF.dropNan $ DataFrame cols vals
 
-    let sat    = T.eq (dfRaw' ?? "region") 2
-        dfSat  = rowFilter sat dfRaw'
+    let dfReg  = DF.rowFilter (region reg dfRaw') dfRaw'
 
-    dfShuff    <- DF.shuffleIO dfSat
+    dfShuff    <- DF.shuffleIO dfReg
 
     let dfT    = DF.dropNan 
                $ DF.union (trafo maskX <$> DF.lookup paramsX dfShuff)
@@ -149,7 +150,7 @@ run Args{..} = do
     !net'' <- loadCheckPoint modelPath (OpNetSpec numInputs numOutputs) num 
                     >>= noGrad . fst
 
-    let tracePath = modelPath ++ "/" ++ dev' ++ ".pt"
+    let tracePath = modelPath ++ "/" ++ dev' ++ "-" ++ reg' ++ ".pt"
         num'      = numInputs + 1
         predict x = y
           where
@@ -166,23 +167,24 @@ run Args{..} = do
     putStrLn $ "Final Checkpoint saved at: " ++ modelPath
     putStrLn $ "Traced Model saved at: " ++ tracePath
 
-    -- testModel dfRaw' ("id" : paramsX) paramsY predict
+    testModel reg dfRaw' ("id" : paramsX) paramsY predict
   where
+    reg'       = if reg == 2 then "sat" else "ulp"
     pdk'       = show pdk
     dev'       = show dev
     testSplit  = 0.75
     paramsX    = ["gmoverid", "fug", "Vds", "Vbs"]
     paramsY    = ["idoverW", "L"]
-    cols       = paramsX ++ paramsY ++ ["id", "region"]
+    cols       = paramsX ++ paramsY ++ ["id", "region", "vth", "Vgs"]
     numInputs  = length paramsX
     numOutputs = length paramsY
     maskX      = T.toDevice T.cpu $ boolMask' ["gmoverid", "id", "fug"] paramsX
     maskY      = T.toDevice T.cpu $ boolMask' ["idoverW", "L"] paramsY
 
-testModel :: DF.DataFrame T.Tensor -> [String] -> [String]
+testModel :: Int -> DF.DataFrame T.Tensor -> [String] -> [String]
           -> (T.Tensor -> T.Tensor) -> IO ()
-testModel df paramsX paramsY mdl = do
-    df' <- DF.sampleIO 10 False $ DF.rowFilter ((df ?? "region") `T.eq` 2) df
+testModel reg df paramsX paramsY mdl = do
+    df' <- DF.sampleIO 10 False $  DF.rowFilter (region reg df) df
     let x  = DF.lookup paramsX df'
         y  = DF.DataFrame paramsY 
            $ T.cat (T.Dim 1) [ T.abs $ (df' ?? "id") / (df' ?? "idoverW")
@@ -192,3 +194,20 @@ testModel df paramsX paramsY mdl = do
     print y
     print y'
     pure ()
+
+-- | Filter region
+-- Saturation: 2
+-- Sub-Threshold: 3
+region :: Int -> DF.DataFrame T.Tensor -> T.Tensor
+region 2 df = T.eq (df ?? "region") 2
+region 3 df = T.logicalOr  (T.eq (df ?? "region") 3) 
+            . T.logicalAnd (T.gt vds 10.0e-3)
+            $ T.logicalAnd (T.gt vgs (vth - vt')) (T.lt vgs (vth + vt''))
+    where
+      vt    = 25.0e-3
+      vt'   = 20 * vt
+      vt''  = 10 * vt
+      vgs   = T.abs $ df ?? "Vgs"
+      vds   = T.abs $ df ?? "Vds"
+      vth   = T.abs $ df ?? "vth"
+region r _  = error $ "Region " ++ show r ++ " not defined"

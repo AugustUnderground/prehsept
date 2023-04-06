@@ -39,6 +39,12 @@ args = Args <$> option auto ( long "pdk"
                            <> showDefault 
                            <> value 25
                            <> help "Number of Epochs" )
+            <*> option auto ( long "reg" 
+                           <> short 'r'
+                           <> metavar "REGION" 
+                           <> showDefault 
+                           <> value 2
+                           <> help "Region of Operation: 2 | 3" )
             <*> option auto ( long "size" 
                            <> short 's'
                            <> metavar "SIZE" 
