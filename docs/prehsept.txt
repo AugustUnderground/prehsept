@@ -31,6 +31,12 @@ nanToNum' :: Tensor -> Tensor
 -- | Default limits for <a>nanToNum</a> (0.0)
 nanToNum'' :: Tensor -> Tensor
 
+-- | MSE with reduction
+mseLoss' :: Reduction -> Tensor -> Tensor -> Tensor
+
+-- | Mean over all dimensions
+meanAll :: Tensor -> Tensor
+
 
 -- | Helper and Utility Functions
 module Lib
@@ -50,8 +56,11 @@ XT018 :: PDK
 -- | Fictional Cadence GPDK180 GPDK 180nm Process
 GPDK180 :: PDK
 
--- | Fictional Cadence GPDK90 GPDK 90nm Process
-GPDK90 :: PDK
+-- | Fictional Cadence GPDK090 GPDK 90nm Process
+GPDK090 :: PDK
+
+-- | Fictional Cadence GPDK045 GPDK 45nm Process
+GPDK045 :: PDK
 
 -- | SkyWater SKY130 130nm Process
 SKY130 :: PDK
@@ -74,6 +83,9 @@ fst3 :: (a, b, c) -> a
 -- | Uncurry triple
 uncurry' :: (a -> b -> c -> d) -> (a, b, c) -> d
 
+-- | Create single element list from given element
+singleton :: a -> [a]
+
 -- | Create a boolean mask from a subset of column names
 boolMask :: [String] -> [String] -> [Bool]
 
@@ -89,6 +101,9 @@ intIdx' :: [String] -> [String] -> Tensor
 -- | Round Float Tensor to n digits
 round :: Int -> Tensor -> Tensor
 
+-- | (Re-) Shuffle batches
+shuffleBatches :: Int -> Tensor -> Tensor -> IO ([Tensor], [Tensor])
+
 -- | Scale data to [0;1]
 scale :: Tensor -> Tensor -> Tensor -> Tensor
 
@@ -101,8 +116,12 @@ trafo :: Tensor -> Tensor -> Tensor
 -- | Apply pow10 to masked data
 trafo' :: Tensor -> Tensor -> Tensor
 
+-- | calculate gm from gm<i>Id and Id, input is [gm</i>Id, Id, fug, Vds,
+--   Vbs]
+process :: Tensor -> Tensor
+
 -- | Default Column Names for stored Tensors
-columnHeader :: PDK -> [String]
+columnHeader :: [String]
 
 -- | Load a Pickled Tensor from file
 loadTensor :: FilePath -> IO Tensor
@@ -124,22 +143,28 @@ createModelDir' :: String -> String -> IO String
 
 -- | Command Line Arguments
 data Args
-Args :: PDK -> Device -> FilePath -> Int -> Int -> Args
+Args :: !PDK -> !Device -> !FilePath -> !Int -> !Int -> !Int -> !Bool -> Args
 
 -- | PDK
-[pdk] :: Args -> PDK
+[pdk] :: Args -> !PDK
 
 -- | NMOS | PMOS
-[dev] :: Args -> Device
+[dev] :: Args -> !Device
 
 -- | Path to Data
-[dir] :: Args -> FilePath
+[dir] :: Args -> !FilePath
 
 -- | Number of Epochs
-[num] :: Args -> Int
+[num] :: Args -> !Int
+
+-- | Area of Operation
+[reg] :: Args -> !Int
 
 -- | Batch Size
-[size] :: Args -> Int
+[size] :: Args -> !Int
+
+-- | Experimental
+[exp] :: Args -> !Bool
 
 -- | Progress Bar Style for Training
 trainStyle :: Int -> Style s
@@ -160,24 +185,24 @@ module Net
 
 -- | Neural Network Specification
 data OpNetSpec
-OpNetSpec :: Int -> Int -> OpNetSpec
+OpNetSpec :: !Int -> !Int -> OpNetSpec
 
 -- | Number of input neurons
-[numX] :: OpNetSpec -> Int
+[numX] :: OpNetSpec -> !Int
 
 -- | Number of output neurons
-[numY] :: OpNetSpec -> Int
+[numY] :: OpNetSpec -> !Int
 
 -- | Network Architecture
 data OpNet
-OpNet :: Linear -> Linear -> Linear -> Linear -> Linear -> Linear -> Linear -> OpNet
-[fc0] :: OpNet -> Linear
-[fc1] :: OpNet -> Linear
-[fc2] :: OpNet -> Linear
-[fc3] :: OpNet -> Linear
-[fc4] :: OpNet -> Linear
-[fc5] :: OpNet -> Linear
-[fc6] :: OpNet -> Linear
+OpNet :: !Linear -> !Linear -> !Linear -> !Linear -> !Linear -> !Linear -> !Linear -> OpNet
+[fc0] :: OpNet -> !Linear
+[fc1] :: OpNet -> !Linear
+[fc2] :: OpNet -> !Linear
+[fc3] :: OpNet -> !Linear
+[fc4] :: OpNet -> !Linear
+[fc5] :: OpNet -> !Linear
+[fc6] :: OpNet -> !Linear
 
 -- | Neural Network Forward Pass with scaled Data
 forward :: OpNet -> Tensor -> Tensor
@@ -192,7 +217,10 @@ saveCheckPoint :: FilePath -> OpNet -> Adam -> IO ()
 loadCheckPoint :: FilePath -> OpNetSpec -> Int -> IO (OpNet, Adam)
 
 -- | Trace and Return a Script Module
-traceModel :: Device -> PDK -> Int -> (Tensor -> Tensor) -> IO ScriptModule
+traceModel :: Device -> PDK -> Int -> [String] -> [String] -> (Tensor -> Tensor) -> IO ScriptModule
+
+-- | Trace to Function
+unTraceModel :: ScriptModule -> Tensor -> Tensor
 
 -- | Save a Traced ScriptModule
 saveInferenceModel :: FilePath -> ScriptModule -> IO ()
@@ -212,13 +240,13 @@ module Data.Frame
 
 -- | Data Frame
 data DataFrame a
-DataFrame :: [String] -> a -> DataFrame a
+DataFrame :: ![String] -> !a -> DataFrame a
 
 -- | Unique Column Identifier
-[columns] :: DataFrame a -> [String]
+[columns] :: DataFrame a -> ![String]
 
 -- | Data
-[values] :: DataFrame a -> a
+[values] :: DataFrame a -> !a
 
 -- | Number of Rows in DataFrame
 nRows :: DataFrame Tensor -> Int
@@ -230,13 +258,14 @@ nCols :: DataFrame Tensor -> Int
 fromFile' :: [String] -> FilePath -> IO (DataFrame Tensor)
 
 -- | Load Tensor from file and construct DataFrame with default Header
-fromFile :: PDK -> FilePath -> IO (DataFrame Tensor)
+fromFile :: FilePath -> IO (DataFrame Tensor)
 
 -- | Look up columns
 lookup :: [String] -> DataFrame Tensor -> DataFrame Tensor
 
 -- | Shorthand for looking up a single key
 (??) :: DataFrame Tensor -> String -> Tensor
+infixr 5 ??
 
 -- | Lookup Rows by index
 rowSelect' :: [Int] -> DataFrame Tensor -> DataFrame Tensor
@@ -305,9 +334,6 @@ module HyperParameters
 -- | Module for running training
 module Run
 
--- | Filter Datapoints not in saturation
-satMask :: Device -> DataFrame Tensor -> Tensor
-
 -- | Run one Update Step
 trainStep :: Tensor -> Tensor -> OpNet -> Adam -> IO (OpNet, Adam, Tensor)
 
@@ -321,7 +347,22 @@ validStep :: Tensor -> Tensor -> OpNet -> IO Tensor
 validationEpoch :: ProgressBar s -> [Tensor] -> [Tensor] -> OpNet -> [Tensor] -> IO Tensor
 
 -- | Run Training and Validation for a given number of Epochs
-runEpochs :: FilePath -> Int -> [Tensor] -> [Tensor] -> [Tensor] -> [Tensor] -> OpNet -> Adam -> IO (OpNet, Adam)
+runEpochs :: FilePath -> Int -> Int -> Tensor -> Tensor -> Tensor -> Tensor -> OpNet -> Adam -> IO (OpNet, Adam)
 
 -- | Initiate Training Run for given Args
 run :: Args -> IO ()
+
+-- | Experimental Training Run
+runExp :: Args -> IO ()
+
+-- | Basic Training Run
+runBase :: Args -> IO ()
+
+-- | Model Test
+testModel :: Int -> DataFrame Tensor -> [String] -> [String] -> (Tensor -> Tensor) -> IO ()
+
+-- | Experimental Model Test
+testModelExp :: DataFrame Tensor -> [String] -> [String] -> (Tensor -> Tensor) -> IO ()
+
+-- | Filter region Experimental: -1 Saturation: 2 Sub-Threshold: 3
+region :: Int -> DataFrame Tensor -> Tensor

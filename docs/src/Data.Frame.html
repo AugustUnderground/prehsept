@@ -1,0 +1,748 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wall #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards #-}</span><span>
+</span><span id="line-4"></span><span>
+</span><span id="line-5"></span><span class="hs-comment">-- | A module for storing Tabular Data as Tensors</span><span>
+</span><span id="line-6"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Data.Frame</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Data.List</span></span><span>                             </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">elemIndex</span></span><span class="hs-special">)</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><a href="Lib.html"><span class="hs-identifier">Lib</span></a></span><span>                            </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Lib.html#round"><span class="hs-identifier">round</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-10"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">Prelude</span></span><span>                        </span><span class="hs-keyword">hiding</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">lookup</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">concat</span></span><span class="hs-special">)</span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Torch</span></span><span>                     </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Torch.Functional.Internal</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>        </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">isinf</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">argsort</span></span><span class="hs-special">)</span><span>
+</span><span id="line-13"></span><span>
+</span><span id="line-14"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-15"></span><span class="hs-comment">-- Base Data Type</span><span>
+</span><span id="line-16"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-17"></span><span>
+</span><span id="line-18"></span><span class="hs-comment">-- | Data Frame</span><span>
+</span><span id="line-19"></span><span class="hs-keyword">data</span><span> </span><span id="DataFrame"><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span></span><span> </span><span id="local-6989586621679110465"><span class="annot"><a href="#local-6989586621679110465"><span class="hs-identifier hs-type">a</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span id="DataFrame"><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span></span><span> </span><span class="hs-special">{</span><span> </span><span id="columns"><span class="annot"><span class="annottext">DataFrame a -&gt; [String]
+</span><a href="Data.Frame.html#columns"><span class="hs-identifier hs-var hs-var">columns</span></a></span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span> </span><span class="hs-comment">-- ^ Unique Column Identifier</span><span>
+</span><span id="line-20"></span><span>                             </span><span class="hs-special">,</span><span> </span><span id="values"><span class="annot"><span class="annottext">DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span></span><span>  </span><span class="hs-glyph">::</span><span> </span><span class="hs-glyph">!</span><span class="annot"><a href="#local-6989586621679110465"><span class="hs-identifier hs-type">a</span></a></span><span>        </span><span class="hs-comment">-- ^ Data</span><span>
+</span><span id="line-21"></span><span>                             </span><span class="hs-special">}</span><span> </span><span class="hs-keyword">deriving</span><span> </span><span class="hs-special">(</span><span id="local-6989586621679110421"><span id="local-6989586621679110423"><span id="local-6989586621679110425"><span class="annot"><span class="annottext">Int -&gt; DataFrame a -&gt; ShowS
+[DataFrame a] -&gt; ShowS
+DataFrame a -&gt; String
+(Int -&gt; DataFrame a -&gt; ShowS)
+-&gt; (DataFrame a -&gt; String)
+-&gt; ([DataFrame a] -&gt; ShowS)
+-&gt; Show (DataFrame a)
+forall a. Show a =&gt; Int -&gt; DataFrame a -&gt; ShowS
+forall a. Show a =&gt; [DataFrame a] -&gt; ShowS
+forall a. Show a =&gt; DataFrame a -&gt; String
+forall a.
+(Int -&gt; a -&gt; ShowS) -&gt; (a -&gt; String) -&gt; ([a] -&gt; ShowS) -&gt; Show a
+showList :: [DataFrame a] -&gt; ShowS
+$cshowList :: forall a. Show a =&gt; [DataFrame a] -&gt; ShowS
+show :: DataFrame a -&gt; String
+$cshow :: forall a. Show a =&gt; DataFrame a -&gt; String
+showsPrec :: Int -&gt; DataFrame a -&gt; ShowS
+$cshowsPrec :: forall a. Show a =&gt; Int -&gt; DataFrame a -&gt; ShowS
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var hs-var hs-var hs-var hs-var">Show</span></span></span></span></span><span class="hs-special">)</span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- | Functor instance for Mapping over values</span><span>
+</span><span id="line-24"></span><span class="hs-keyword">instance</span><span> </span><span id="local-6989586621679110417"><span class="annot"><span class="hs-identifier hs-type">Functor</span></span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span></span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-25"></span><span>  </span><span id="local-6989586621679110415"><span class="annot"><span class="annottext">fmap :: (a -&gt; b) -&gt; DataFrame a -&gt; DataFrame b
+</span><span class="hs-identifier hs-var hs-var hs-var hs-var">fmap</span></span></span><span> </span><span id="local-6989586621679110414"><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679110414"><span class="hs-identifier hs-var">f</span></a></span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span id="local-6989586621679110413"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110413"><span class="hs-identifier hs-var">c</span></a></span></span><span> </span><span id="local-6989586621679110412"><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110412"><span class="hs-identifier hs-var">v</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; b -&gt; DataFrame b
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110413"><span class="hs-identifier hs-var">c</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">a -&gt; b
+</span><a href="#local-6989586621679110414"><span class="hs-identifier hs-var">f</span></a></span><span> </span><span class="annot"><span class="annottext">a
+</span><a href="#local-6989586621679110412"><span class="hs-identifier hs-var">v</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-28"></span><span class="hs-comment">-- API</span><span>
+</span><span id="line-29"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- | Number of Rows in DataFrame</span><span>
+</span><span id="line-32"></span><span class="annot"><a href="Data.Frame.html#nRows"><span class="hs-identifier hs-type">nRows</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-33"></span><span id="nRows"><span class="annot"><span class="annottext">nRows :: DataFrame Tensor -&gt; Int
+</span><a href="Data.Frame.html#nRows"><span class="hs-identifier hs-var hs-var">nRows</span></a></span></span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span class="hs-special">{</span><span id="local-6989586621679110409"><span id="local-6989586621679110410"><span class="annot"><span class="annottext">[String]
+Tensor
+values :: Tensor
+columns :: [String]
+values :: forall a. DataFrame a -&gt; a
+columns :: forall a. DataFrame a -&gt; [String]
+</span><a href="#local-6989586621679110409"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; Int
+forall a. [a] -&gt; a
+</span><span class="hs-identifier hs-var">head</span></span><span> </span><span class="annot"><span class="annottext">([Int] -&gt; Int) -&gt; [Int] -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; [Int]
+</span><span class="hs-identifier hs-var">T.shape</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110409"><span class="hs-identifier hs-var">values</span></a></span><span>
+</span><span id="line-34"></span><span>
+</span><span id="line-35"></span><span class="hs-comment">-- | Number of Columns in DataFrame</span><span>
+</span><span id="line-36"></span><span class="annot"><a href="Data.Frame.html#nCols"><span class="hs-identifier hs-type">nCols</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span>
+</span><span id="line-37"></span><span id="nCols"><span class="annot"><span class="annottext">nCols :: DataFrame Tensor -&gt; Int
+</span><a href="Data.Frame.html#nCols"><span class="hs-identifier hs-var hs-var">nCols</span></a></span></span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span class="hs-special">{</span><span id="local-6989586621679110404"><span id="local-6989586621679110405"><span class="annot"><span class="annottext">[String]
+Tensor
+values :: Tensor
+columns :: [String]
+values :: forall a. DataFrame a -&gt; a
+columns :: forall a. DataFrame a -&gt; [String]
+</span><a href="#local-6989586621679110404"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Int
+forall (t :: * -&gt; *) a. Foldable t =&gt; t a -&gt; Int
+</span><span class="hs-identifier hs-var">length</span></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110405"><span class="hs-identifier hs-var">columns</span></a></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- | Load Tensor from file and construct DataFrame with given Header</span><span>
+</span><span id="line-40"></span><span class="annot"><a href="Data.Frame.html#fromFile%27"><span class="hs-identifier hs-type">fromFile'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">)</span><span>
+</span><span id="line-41"></span><span id="fromFile%27"><span class="annot"><span class="annottext">fromFile' :: [String] -&gt; String -&gt; IO (DataFrame Tensor)
+</span><a href="Data.Frame.html#fromFile%27"><span class="hs-identifier hs-var hs-var">fromFile'</span></a></span></span><span> </span><span id="local-6989586621679110400"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110400"><span class="hs-identifier hs-var">cols</span></a></span></span><span> </span><span id="local-6989586621679110399"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679110399"><span class="hs-identifier hs-var">path</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-42"></span><span>    </span><span id="local-6989586621679110398"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110398"><span class="hs-identifier hs-var">vals</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">String -&gt; IO Tensor
+</span><a href="Lib.html#loadTensor"><span class="hs-identifier hs-var">loadTensor</span></a></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679110399"><span class="hs-identifier hs-var">path</span></a></span><span>
+</span><span id="line-43"></span><span>    </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; IO (DataFrame Tensor)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; IO (DataFrame Tensor))
+-&gt; DataFrame Tensor -&gt; IO (DataFrame Tensor)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110400"><span class="hs-identifier hs-var">cols</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110398"><span class="hs-identifier hs-var">vals</span></a></span><span>
+</span><span id="line-44"></span><span>
+</span><span id="line-45"></span><span class="hs-comment">-- | Load Tensor from file and construct DataFrame with default Header</span><span>
+</span><span id="line-46"></span><span class="annot"><a href="Data.Frame.html#fromFile"><span class="hs-identifier hs-type">fromFile</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">FilePath</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">)</span><span>
+</span><span id="line-47"></span><span id="fromFile"><span class="annot"><span class="annottext">fromFile :: String -&gt; IO (DataFrame Tensor)
+</span><a href="Data.Frame.html#fromFile"><span class="hs-identifier hs-var hs-var">fromFile</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; String -&gt; IO (DataFrame Tensor)
+</span><a href="Data.Frame.html#fromFile%27"><span class="hs-identifier hs-var">fromFile'</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="Lib.html#columnHeader"><span class="hs-identifier hs-var">columnHeader</span></a></span><span> </span><span class="hs-comment">-- (columnHeader pdk')</span><span>
+</span><span id="line-48"></span><span>
+</span><span id="line-49"></span><span class="hs-comment">-- | Look up columns</span><span>
+</span><span id="line-50"></span><span class="annot"><a href="Data.Frame.html#lookup"><span class="hs-identifier hs-type">lookup</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-51"></span><span id="lookup"><span class="annot"><span class="annottext">lookup :: [String] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#lookup"><span class="hs-identifier hs-var hs-var">lookup</span></a></span></span><span> </span><span id="local-6989586621679110393"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110393"><span class="hs-identifier hs-var">cols</span></a></span></span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span class="hs-special">{</span><span id="local-6989586621679110391"><span id="local-6989586621679110392"><span class="annot"><span class="annottext">[String]
+Tensor
+values :: Tensor
+columns :: [String]
+values :: forall a. DataFrame a -&gt; a
+columns :: forall a. DataFrame a -&gt; [String]
+</span><a href="#local-6989586621679110391"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110393"><span class="hs-identifier hs-var">cols</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110390"><span class="hs-identifier hs-var">vals</span></a></span><span>
+</span><span id="line-52"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-53"></span><span>    </span><span id="local-6989586621679110389"><span class="annot"><span class="annottext">idx :: [Int]
+</span><a href="#local-6989586621679110389"><span class="hs-identifier hs-var hs-var">idx</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; [String] -&gt; [Int]
+</span><a href="Lib.html#intIdx"><span class="hs-identifier hs-var">intIdx</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110392"><span class="hs-identifier hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110393"><span class="hs-identifier hs-var">cols</span></a></span><span>
+</span><span id="line-54"></span><span>    </span><span id="local-6989586621679110390"><span class="annot"><span class="annottext">vals :: Tensor
+</span><a href="#local-6989586621679110390"><span class="hs-identifier hs-var hs-var">vals</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679110389"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110391"><span class="hs-identifier hs-var">values</span></a></span><span>
+</span><span id="line-55"></span><span>
+</span><span id="line-56"></span><span class="hs-comment">-- | Shorthand for looking up a single key</span><span>
+</span><span id="line-57"></span><span class="hs-keyword">infixr</span><span> </span><span class="hs-number">5</span><span> </span><span class="annot"><a href="Data.Frame.html#%3F%3F"><span class="hs-operator hs-type">??</span></a></span><span>
+</span><span id="line-58"></span><span class="annot"><a href="Data.Frame.html#%3F%3F"><span class="hs-operator hs-type">(??)</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-59"></span><span id="%3F%3F"><span class="annot"><span class="annottext">?? :: DataFrame Tensor -&gt; String -&gt; Tensor
+</span><a href="Data.Frame.html#%3F%3F"><span class="hs-operator hs-var hs-var">(??)</span></a></span></span><span> </span><span id="local-6989586621679110385"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110385"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span id="local-6989586621679110384"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679110384"><span class="hs-identifier hs-var">key</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#lookup"><span class="hs-identifier hs-var">lookup</span></a></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679110384"><span class="hs-identifier hs-var">key</span></a></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110385"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- | Lookup Rows by index</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Data.Frame.html#rowSelect%27"><span class="hs-identifier hs-type">rowSelect'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-63"></span><span id="rowSelect%27"><span class="annot"><span class="annottext">rowSelect' :: [Int] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect%27"><span class="hs-identifier hs-var hs-var">rowSelect'</span></a></span></span><span> </span><span id="local-6989586621679110382"><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679110382"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span class="hs-special">{</span><span id="local-6989586621679110380"><span id="local-6989586621679110381"><span class="annot"><span class="annottext">[String]
+Tensor
+values :: Tensor
+columns :: [String]
+values :: forall a. DataFrame a -&gt; a
+columns :: forall a. DataFrame a -&gt; [String]
+</span><a href="#local-6989586621679110380"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110381"><span class="hs-identifier hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110379"><span class="hs-identifier hs-var">values'</span></a></span><span>
+</span><span id="line-64"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-65"></span><span>    </span><span id="local-6989586621679110379"><span class="annot"><span class="annottext">values' :: Tensor
+</span><a href="#local-6989586621679110379"><span class="hs-identifier hs-var hs-var">values'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679110382"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110380"><span class="hs-identifier hs-var">values</span></a></span><span>
+</span><span id="line-66"></span><span>
+</span><span id="line-67"></span><span class="hs-comment">-- | Lookup Rows by index</span><span>
+</span><span id="line-68"></span><span class="annot"><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-type">rowSelect</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-69"></span><span id="rowSelect"><span class="annot"><span class="annottext">rowSelect :: Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var hs-var">rowSelect</span></a></span></span><span> </span><span id="local-6989586621679110377"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110377"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span class="hs-special">{</span><span id="local-6989586621679110375"><span id="local-6989586621679110376"><span class="annot"><span class="annottext">[String]
+Tensor
+values :: Tensor
+columns :: [String]
+values :: forall a. DataFrame a -&gt; a
+columns :: forall a. DataFrame a -&gt; [String]
+</span><a href="#local-6989586621679110375"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110376"><span class="hs-identifier hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110374"><span class="hs-identifier hs-var">values'</span></a></span><span>
+</span><span id="line-70"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-71"></span><span>    </span><span id="local-6989586621679110374"><span class="annot"><span class="annottext">values' :: Tensor
+</span><a href="#local-6989586621679110374"><span class="hs-identifier hs-var hs-var">values'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Tensor -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110377"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110375"><span class="hs-identifier hs-var">values</span></a></span><span>
+</span><span id="line-72"></span><span>
+</span><span id="line-73"></span><span class="hs-comment">-- | Filter Rows by condtion</span><span>
+</span><span id="line-74"></span><span class="annot"><a href="Data.Frame.html#rowFilter"><span class="hs-identifier hs-type">rowFilter</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-75"></span><span id="rowFilter"><span class="annot"><span class="annottext">rowFilter :: Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowFilter"><span class="hs-identifier hs-var hs-var">rowFilter</span></a></span></span><span> </span><span id="local-6989586621679110371"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110371"><span class="hs-identifier hs-var">msk</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110370"><span class="hs-identifier hs-var">idx</span></a></span><span>
+</span><span id="line-76"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-77"></span><span>    </span><span id="local-6989586621679110370"><span class="annot"><span class="annottext">idx :: Tensor
+</span><a href="#local-6989586621679110370"><span class="hs-identifier hs-var hs-var">idx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.squeezeAll</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; (Tensor -&gt; Tensor) -&gt; Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">]</span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; (Tensor -&gt; Tensor) -&gt; Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.nonzero</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110371"><span class="hs-identifier hs-var">msk</span></a></span><span>
+</span><span id="line-78"></span><span>
+</span><span id="line-79"></span><span class="hs-comment">-- | Sort Data Frame Ascending or Descending</span><span>
+</span><span id="line-80"></span><span class="annot"><a href="Data.Frame.html#sort"><span class="hs-identifier hs-type">sort</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-81"></span><span id="sort"><span class="annot"><span class="annottext">sort :: Bool -&gt; String -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#sort"><span class="hs-identifier hs-var hs-var">sort</span></a></span></span><span> </span><span id="local-6989586621679110365"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679110365"><span class="hs-identifier hs-var">desc</span></a></span></span><span> </span><span id="local-6989586621679110364"><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679110364"><span class="hs-identifier hs-var">col</span></a></span></span><span> </span><span id="local-6989586621679110363"><span class="annot"><span class="annottext">df :: DataFrame Tensor
+</span><a href="#local-6989586621679110363"><span class="hs-identifier hs-var">df</span></a></span></span><span class="hs-glyph">@</span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span class="hs-special">{</span><span id="local-6989586621679110361"><span id="local-6989586621679110362"><span class="annot"><span class="annottext">[String]
+Tensor
+values :: Tensor
+columns :: [String]
+values :: forall a. DataFrame a -&gt; a
+columns :: forall a. DataFrame a -&gt; [String]
+</span><a href="#local-6989586621679110361"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110360"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110363"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-82"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-83"></span><span>    </span><span class="annot"><span class="hs-identifier hs-type">Just</span></span><span> </span><span id="local-6989586621679110359"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110359"><span class="hs-identifier hs-var">colIdx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">String -&gt; [String] -&gt; Maybe Int
+forall a. Eq a =&gt; a -&gt; [a] -&gt; Maybe Int
+</span><span class="hs-identifier hs-var">elemIndex</span></span><span> </span><span class="annot"><span class="annottext">String
+</span><a href="#local-6989586621679110364"><span class="hs-identifier hs-var">col</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110362"><span class="hs-identifier hs-var">columns</span></a></span><span>
+</span><span id="line-84"></span><span>    </span><span id="local-6989586621679110360"><span class="annot"><span class="annottext">idx :: Tensor
+</span><a href="#local-6989586621679110360"><span class="hs-identifier hs-var hs-var">idx</span></a></span></span><span>         </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.squeezeAll</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; (Tensor -&gt; Tensor) -&gt; Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110359"><span class="hs-identifier hs-var">colIdx</span></a></span><span class="hs-special">]</span><span> </span><span>
+</span><span id="line-85"></span><span>                </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Int -&gt; Bool -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.argsort</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110361"><span class="hs-identifier hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679110365"><span class="hs-identifier hs-var">desc</span></a></span><span>
+</span><span id="line-86"></span><span>
+</span><span id="line-87"></span><span class="hs-comment">-- | Drop given Rows from Data Frame</span><span>
+</span><span id="line-88"></span><span class="annot"><a href="Data.Frame.html#rowDrop"><span class="hs-identifier hs-type">rowDrop</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-89"></span><span id="rowDrop"><span class="annot"><span class="annottext">rowDrop :: Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowDrop"><span class="hs-identifier hs-var hs-var">rowDrop</span></a></span></span><span> </span><span id="local-6989586621679110357"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110357"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span id="local-6989586621679110356"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110356"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110355"><span class="hs-identifier hs-var">rows</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110356"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-90"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-91"></span><span>    </span><span id="local-6989586621679110354"><span class="annot"><span class="annottext">idx' :: Tensor
+</span><a href="#local-6989586621679110354"><span class="hs-identifier hs-var hs-var">idx'</span></a></span></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int -&gt; TensorOptions -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.arange</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Int
+</span><a href="Data.Frame.html#nRows"><span class="hs-identifier hs-var">nRows</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110356"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-92"></span><span>                  </span><span class="annot"><span class="annottext">(TensorOptions -&gt; Tensor) -&gt; TensorOptions -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">DType -&gt; TensorOptions -&gt; TensorOptions
+</span><span class="hs-identifier hs-var">T.withDType</span></span><span> </span><span class="annot"><span class="annottext">DType
+</span><span class="hs-identifier hs-var">T.Int64</span></span><span> </span><span class="annot"><span class="annottext">TensorOptions
+</span><span class="hs-identifier hs-var">T.defaultOpts</span></span><span>
+</span><span id="line-93"></span><span>    </span><span class="hs-special">(</span><span id="local-6989586621679110349"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110349"><span class="hs-identifier hs-var">unq</span></a></span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><span class="hs-identifier">_</span></span><span class="hs-special">,</span><span> </span><span id="local-6989586621679110348"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110348"><span class="hs-identifier hs-var">cnt</span></a></span></span><span class="hs-special">)</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Bool -&gt; Bool -&gt; Bool -&gt; Tensor -&gt; (Tensor, Tensor, Tensor)
+</span><span class="hs-identifier hs-var">T.uniqueDim</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">True</span></span><span>
+</span><span id="line-94"></span><span>                  </span><span class="annot"><span class="annottext">(Tensor -&gt; (Tensor, Tensor, Tensor))
+-&gt; Tensor -&gt; (Tensor, Tensor, Tensor)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Dim -&gt; [Tensor] -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.cat</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Dim
+</span><span class="hs-identifier hs-var">T.Dim</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110354"><span class="hs-identifier hs-var">idx'</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110357"><span class="hs-identifier hs-var">idx</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-95"></span><span>    </span><span id="local-6989586621679110355"><span class="annot"><span class="annottext">rows :: Tensor
+</span><a href="#local-6989586621679110355"><span class="hs-identifier hs-var hs-var">rows</span></a></span></span><span>          </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.maskedSelect</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tensor -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.lt</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110348"><span class="hs-identifier hs-var">cnt</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><span class="hs-number">2</span></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110349"><span class="hs-identifier hs-var">unq</span></a></span><span>
+</span><span id="line-96"></span><span>
+</span><span id="line-97"></span><span class="hs-comment">-- | Drop given Rows from Data Frame</span><span>
+</span><span id="line-98"></span><span class="annot"><a href="Data.Frame.html#rowDrop%27"><span class="hs-identifier hs-type">rowDrop'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-99"></span><span id="rowDrop%27"><span class="annot"><span class="annottext">rowDrop' :: [Int] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowDrop%27"><span class="hs-identifier hs-var hs-var">rowDrop'</span></a></span></span><span> </span><span id="local-6989586621679110341"><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679110341"><span class="hs-identifier hs-var">idx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowDrop"><span class="hs-identifier hs-var">rowDrop</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110340"><span class="hs-identifier hs-var">idx'</span></a></span><span>
+</span><span id="line-100"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-101"></span><span>    </span><span id="local-6989586621679110340"><span class="annot"><span class="annottext">idx' :: Tensor
+</span><a href="#local-6989586621679110340"><span class="hs-identifier hs-var hs-var">idx'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; Tensor
+forall a. TensorLike a =&gt; a -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.asTensor</span></span><span> </span><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679110341"><span class="hs-identifier hs-var">idx</span></a></span><span>
+</span><span id="line-102"></span><span>
+</span><span id="line-103"></span><span class="hs-comment">-- | Row index of all NaNs and Infs in Data Frame</span><span>
+</span><span id="line-104"></span><span class="annot"><a href="Data.Frame.html#idxNan"><span class="hs-identifier hs-type">idxNan</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-105"></span><span id="idxNan"><span class="annot"><span class="annottext">idxNan :: DataFrame Tensor -&gt; Tensor
+</span><a href="Data.Frame.html#idxNan"><span class="hs-identifier hs-var hs-var">idxNan</span></a></span></span><span> </span><span id="local-6989586621679110337"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110337"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.squeezeAll</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Dim -&gt; [Tensor] -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.cat</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Dim
+</span><span class="hs-identifier hs-var">T.Dim</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110336"><span class="hs-identifier hs-var">infIdx</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110335"><span class="hs-identifier hs-var">nanIdx</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-106"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-107"></span><span>    </span><span id="local-6989586621679110336"><span class="annot"><span class="annottext">infIdx :: Tensor
+</span><a href="#local-6989586621679110336"><span class="hs-identifier hs-var hs-var">infIdx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.squeezeAll</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">]</span><span>
+</span><span id="line-108"></span><span>           </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.nonzero</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.isinf</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110337"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-109"></span><span>    </span><span id="local-6989586621679110335"><span class="annot"><span class="annottext">nanIdx :: Tensor
+</span><a href="#local-6989586621679110335"><span class="hs-identifier hs-var hs-var">nanIdx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.squeezeAll</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">]</span><span>
+</span><span id="line-110"></span><span>           </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.nonzero</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.isnan</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110337"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-111"></span><span>
+</span><span id="line-112"></span><span class="hs-comment">-- | Drop all Rows with NaNs and Infs (just calls idxNan and rowDrop)</span><span>
+</span><span id="line-113"></span><span class="annot"><a href="Data.Frame.html#dropNan"><span class="hs-identifier hs-type">dropNan</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-114"></span><span id="dropNan"><span class="annot"><span class="annottext">dropNan :: DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#dropNan"><span class="hs-identifier hs-var hs-var">dropNan</span></a></span></span><span> </span><span id="local-6989586621679110332"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110332"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowDrop"><span class="hs-identifier hs-var">rowDrop</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+</span><a href="Data.Frame.html#idxNan"><span class="hs-identifier hs-var">idxNan</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110332"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110332"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-115"></span><span>
+</span><span id="line-116"></span><span class="hs-comment">-- | Update given columns with new values (Tensor dimensions must match)</span><span>
+</span><span id="line-117"></span><span class="annot"><a href="Data.Frame.html#update"><span class="hs-identifier hs-type">update</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-118"></span><span id="update"><span class="annot"><span class="annottext">update :: [String] -&gt; Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#update"><span class="hs-identifier hs-var hs-var">update</span></a></span></span><span> </span><span id="local-6989586621679110330"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110330"><span class="hs-identifier hs-var">cols</span></a></span></span><span> </span><span id="local-6989586621679110329"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110329"><span class="hs-identifier hs-var">vals</span></a></span></span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span class="hs-special">{</span><span id="local-6989586621679110327"><span id="local-6989586621679110328"><span class="annot"><span class="annottext">[String]
+Tensor
+values :: Tensor
+columns :: [String]
+values :: forall a. DataFrame a -&gt; a
+columns :: forall a. DataFrame a -&gt; [String]
+</span><a href="#local-6989586621679110327"><span class="hs-glyph hs-var hs-var hs-var hs-var">..</span></a></span></span></span><span class="hs-special">}</span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110328"><span class="hs-identifier hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110326"><span class="hs-identifier hs-var">values'</span></a></span><span>
+</span><span id="line-119"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-120"></span><span>    </span><span id="local-6989586621679110325"><span class="annot"><span class="annottext">idx :: Tensor
+</span><a href="#local-6989586621679110325"><span class="hs-identifier hs-var hs-var">idx</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[Int] -&gt; TensorOptions -&gt; Tensor
+forall a. TensorLike a =&gt; a -&gt; TensorOptions -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.asTensor'</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">[String] -&gt; [String] -&gt; [Int]
+</span><a href="Lib.html#intIdx"><span class="hs-identifier hs-var">intIdx</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110328"><span class="hs-identifier hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110330"><span class="hs-identifier hs-var">cols</span></a></span><span class="hs-special">)</span><span> </span><span>
+</span><span id="line-121"></span><span>            </span><span class="annot"><span class="annottext">(TensorOptions -&gt; Tensor) -&gt; TensorOptions -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">DType -&gt; TensorOptions -&gt; TensorOptions
+</span><span class="hs-identifier hs-var">T.withDType</span></span><span> </span><span class="annot"><span class="annottext">DType
+</span><span class="hs-identifier hs-var">T.Int64</span></span><span> </span><span class="annot"><span class="annottext">TensorOptions
+</span><span class="hs-identifier hs-var">T.defaultOpts</span></span><span>
+</span><span id="line-122"></span><span>    </span><span id="local-6989586621679110326"><span class="annot"><span class="annottext">values' :: Tensor
+</span><a href="#local-6989586621679110326"><span class="hs-identifier hs-var hs-var">values'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.transpose2D</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; [Tensor] -&gt; Tensor -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexPut</span></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110325"><span class="hs-identifier hs-var">idx</span></a></span><span class="hs-special">]</span><span> </span><span>
+</span><span id="line-123"></span><span>                </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.transpose2D</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110329"><span class="hs-identifier hs-var">vals</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.transpose2D</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110327"><span class="hs-identifier hs-var">values</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-124"></span><span>
+</span><span id="line-125"></span><span class="hs-comment">-- | Union of two data frames</span><span>
+</span><span id="line-126"></span><span class="annot"><a href="Data.Frame.html#union"><span class="hs-identifier hs-type">union</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-127"></span><span id="union"><span class="annot"><span class="annottext">union :: DataFrame Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#union"><span class="hs-identifier hs-var hs-var">union</span></a></span></span><span>  </span><span id="local-6989586621679110320"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110320"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span id="local-6989586621679110319"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110319"><span class="hs-identifier hs-var">df'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110318"><span class="hs-identifier hs-var">cols</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110317"><span class="hs-identifier hs-var">vals</span></a></span><span>
+</span><span id="line-128"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-129"></span><span>    </span><span id="local-6989586621679110318"><span class="annot"><span class="annottext">cols :: [String]
+</span><a href="#local-6989586621679110318"><span class="hs-identifier hs-var hs-var">cols</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; [String]
+forall a. DataFrame a -&gt; [String]
+</span><a href="Data.Frame.html#columns"><span class="hs-identifier hs-var hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110320"><span class="hs-identifier hs-var">df</span></a></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; [String] -&gt; [String]
+forall a. [a] -&gt; [a] -&gt; [a]
+</span><span class="hs-operator hs-var">++</span></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; [String]
+forall a. DataFrame a -&gt; [String]
+</span><a href="Data.Frame.html#columns"><span class="hs-identifier hs-var hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110319"><span class="hs-identifier hs-var">df'</span></a></span><span>
+</span><span id="line-130"></span><span>    </span><span id="local-6989586621679110317"><span class="annot"><span class="annottext">vals :: Tensor
+</span><a href="#local-6989586621679110317"><span class="hs-identifier hs-var hs-var">vals</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Dim -&gt; [Tensor] -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.cat</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Dim
+</span><span class="hs-identifier hs-var">T.Dim</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110320"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110319"><span class="hs-identifier hs-var">df'</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-131"></span><span>
+</span><span id="line-132"></span><span class="hs-comment">-- | Add columns with data</span><span>
+</span><span id="line-133"></span><span class="annot"><a href="Data.Frame.html#insert"><span class="hs-identifier hs-type">insert</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-134"></span><span id="insert"><span class="annot"><span class="annottext">insert :: [String] -&gt; Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#insert"><span class="hs-identifier hs-var hs-var">insert</span></a></span></span><span> </span><span id="local-6989586621679110315"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110315"><span class="hs-identifier hs-var">cols</span></a></span></span><span> </span><span id="local-6989586621679110314"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110314"><span class="hs-identifier hs-var">vals</span></a></span></span><span> </span><span id="local-6989586621679110313"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110313"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110313"><span class="hs-identifier hs-var">df</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#union"><span class="hs-operator hs-var">`union`</span></a></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110315"><span class="hs-identifier hs-var">cols</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110314"><span class="hs-identifier hs-var">vals</span></a></span><span>
+</span><span id="line-135"></span><span>
+</span><span id="line-136"></span><span class="hs-comment">-- | Join 2 DataFrames, columns must line up</span><span>
+</span><span id="line-137"></span><span class="annot"><a href="Data.Frame.html#join"><span class="hs-identifier hs-type">join</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-138"></span><span id="join"><span class="annot"><span class="annottext">join :: DataFrame Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#join"><span class="hs-identifier hs-var hs-var">join</span></a></span></span><span> </span><span id="local-6989586621679110311"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110311"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span id="local-6989586621679110310"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110310"><span class="hs-identifier hs-var">df'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; Tensor -&gt; DataFrame Tensor
+forall a. [String] -&gt; a -&gt; DataFrame a
+</span><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-var">DataFrame</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110309"><span class="hs-identifier hs-var">columns'</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110308"><span class="hs-identifier hs-var">values'</span></a></span><span>
+</span><span id="line-139"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-140"></span><span>    </span><span id="local-6989586621679110307"><span class="annot"><span class="annottext">idx :: [Int]
+</span><a href="#local-6989586621679110307"><span class="hs-identifier hs-var hs-var">idx</span></a></span></span><span>      </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">[String] -&gt; [String] -&gt; [Int]
+</span><a href="Lib.html#intIdx"><span class="hs-identifier hs-var">intIdx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; [String]
+forall a. DataFrame a -&gt; [String]
+</span><a href="Data.Frame.html#columns"><span class="hs-identifier hs-var hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110311"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">)</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; [String]
+forall a. DataFrame a -&gt; [String]
+</span><a href="Data.Frame.html#columns"><span class="hs-identifier hs-var hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110310"><span class="hs-identifier hs-var">df'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-141"></span><span>    </span><span id="local-6989586621679110306"><span class="annot"><span class="annottext">vals :: Tensor
+</span><a href="#local-6989586621679110306"><span class="hs-identifier hs-var hs-var">vals</span></a></span></span><span>     </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; [Int] -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.indexSelect'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span class="annot"><span class="annottext">[Int]
+</span><a href="#local-6989586621679110307"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110310"><span class="hs-identifier hs-var">df'</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-142"></span><span>    </span><span id="local-6989586621679110308"><span class="annot"><span class="annottext">values' :: Tensor
+</span><a href="#local-6989586621679110308"><span class="hs-identifier hs-var hs-var">values'</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Dim -&gt; [Tensor] -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.cat</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int -&gt; Dim
+</span><span class="hs-identifier hs-var">T.Dim</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span class="hs-special">)</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110311"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110306"><span class="hs-identifier hs-var">vals</span></a></span><span class="hs-special">]</span><span>
+</span><span id="line-143"></span><span>    </span><span id="local-6989586621679110309"><span class="annot"><span class="annottext">columns' :: [String]
+</span><a href="#local-6989586621679110309"><span class="hs-identifier hs-var hs-var">columns'</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; [String]
+forall a. DataFrame a -&gt; [String]
+</span><a href="Data.Frame.html#columns"><span class="hs-identifier hs-var hs-var">columns</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110311"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-144"></span><span>
+</span><span id="line-145"></span><span class="hs-comment">-- | Concatenate a list of Data Frames</span><span>
+</span><span id="line-146"></span><span class="annot"><a href="Data.Frame.html#concat"><span class="hs-identifier hs-type">concat</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-147"></span><span id="concat"><span class="annot"><span class="annottext">concat :: [DataFrame Tensor] -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#concat"><span class="hs-identifier hs-var hs-var">concat</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor)
+-&gt; [DataFrame Tensor] -&gt; DataFrame Tensor
+forall (t :: * -&gt; *) a. Foldable t =&gt; (a -&gt; a -&gt; a) -&gt; t a -&gt; a
+</span><span class="hs-identifier hs-var">foldl1</span></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#join"><span class="hs-identifier hs-var">join</span></a></span><span>
+</span><span id="line-148"></span><span>
+</span><span id="line-149"></span><span class="hs-comment">-- | Take n Random samples from Data Frame</span><span>
+</span><span id="line-150"></span><span class="annot"><a href="Data.Frame.html#sampleIO"><span class="hs-identifier hs-type">sampleIO</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Int</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Bool</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">)</span><span>
+</span><span id="line-151"></span><span id="sampleIO"><span class="annot"><span class="annottext">sampleIO :: Int -&gt; Bool -&gt; DataFrame Tensor -&gt; IO (DataFrame Tensor)
+</span><a href="Data.Frame.html#sampleIO"><span class="hs-identifier hs-var hs-var">sampleIO</span></a></span></span><span> </span><span id="local-6989586621679110302"><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110302"><span class="hs-identifier hs-var">num</span></a></span></span><span> </span><span id="local-6989586621679110301"><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679110301"><span class="hs-identifier hs-var">replace</span></a></span></span><span> </span><span id="local-6989586621679110300"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110300"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-keyword">do</span><span>
+</span><span id="line-152"></span><span>    </span><span id="local-6989586621679110299"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110299"><span class="hs-identifier hs-var">idx'</span></a></span></span><span> </span><span class="hs-glyph">&lt;-</span><span> </span><span class="annot"><span class="annottext">DType -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.toDType</span></span><span> </span><span class="annot"><span class="annottext">DType
+</span><span class="hs-identifier hs-var">T.Int64</span></span><span> </span><span class="annot"><span class="annottext">(Tensor -&gt; Tensor) -&gt; IO Tensor -&gt; IO Tensor
+forall (f :: * -&gt; *) a b. Functor f =&gt; (a -&gt; b) -&gt; f a -&gt; f b
+</span><span class="hs-operator hs-var">&lt;$&gt;</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Int -&gt; Bool -&gt; IO Tensor
+</span><span class="hs-identifier hs-var">T.multinomialIO</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110295"><span class="hs-identifier hs-var">idx</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110302"><span class="hs-identifier hs-var">num</span></a></span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679110294"><span class="hs-identifier hs-var">rep</span></a></span><span>
+</span><span id="line-153"></span><span>    </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; IO (DataFrame Tensor)
+forall (f :: * -&gt; *) a. Applicative f =&gt; a -&gt; f a
+</span><span class="hs-identifier hs-var">pure</span></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; IO (DataFrame Tensor))
+-&gt; DataFrame Tensor -&gt; IO (DataFrame Tensor)
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110299"><span class="hs-identifier hs-var">idx'</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110300"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-154"></span><span>  </span><span class="hs-keyword">where</span><span> </span><span>
+</span><span id="line-155"></span><span>    </span><span id="local-6989586621679110293"><span class="annot"><span class="annottext">len :: Int
+</span><a href="#local-6989586621679110293"><span class="hs-identifier hs-var hs-var">len</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Int
+</span><a href="Data.Frame.html#nRows"><span class="hs-identifier hs-var">nRows</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110300"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-156"></span><span>    </span><span id="local-6989586621679110294"><span class="annot"><span class="annottext">rep :: Bool
+</span><a href="#local-6989586621679110294"><span class="hs-identifier hs-var hs-var">rep</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><a href="#local-6989586621679110301"><span class="hs-identifier hs-var">replace</span></a></span><span> </span><span class="annot"><span class="annottext">Bool -&gt; Bool -&gt; Bool
+</span><span class="hs-operator hs-var">&amp;&amp;</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110293"><span class="hs-identifier hs-var">len</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Bool
+forall a. Ord a =&gt; a -&gt; a -&gt; Bool
+</span><span class="hs-operator hs-var">&lt;=</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110302"><span class="hs-identifier hs-var">num</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-157"></span><span>    </span><span id="local-6989586621679110295"><span class="annot"><span class="annottext">idx :: Tensor
+</span><a href="#local-6989586621679110295"><span class="hs-identifier hs-var hs-var">idx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.arange'</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110293"><span class="hs-identifier hs-var">len</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-158"></span><span>
+</span><span id="line-159"></span><span class="hs-comment">-- | Shuffle all rows</span><span>
+</span><span id="line-160"></span><span class="annot"><a href="Data.Frame.html#shuffleIO"><span class="hs-identifier hs-type">shuffleIO</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">IO</span></span><span> </span><span class="hs-special">(</span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">)</span><span>
+</span><span id="line-161"></span><span id="shuffleIO"><span class="annot"><span class="annottext">shuffleIO :: DataFrame Tensor -&gt; IO (DataFrame Tensor)
+</span><a href="Data.Frame.html#shuffleIO"><span class="hs-identifier hs-var hs-var">shuffleIO</span></a></span></span><span> </span><span id="local-6989586621679110288"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110288"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Bool -&gt; DataFrame Tensor -&gt; IO (DataFrame Tensor)
+</span><a href="Data.Frame.html#sampleIO"><span class="hs-identifier hs-var">sampleIO</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Int
+</span><a href="Data.Frame.html#nRows"><span class="hs-identifier hs-var">nRows</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110288"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Bool
+</span><span class="hs-identifier hs-var">False</span></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110288"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-162"></span><span>
+</span><span id="line-163"></span><span class="hs-comment">-- | Split a dataframe according to a given ratio</span><span>
+</span><span id="line-164"></span><span class="annot"><a href="Data.Frame.html#trainTestSplit"><span class="hs-identifier hs-type">trainTestSplit</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">[</span><span class="annot"><span class="hs-identifier hs-type">String</span></span><span class="hs-special">]</span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><a href="Data.Frame.html#DataFrame"><span class="hs-identifier hs-type">DataFrame</span></a></span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-165"></span><span>               </span><span class="hs-glyph">-&gt;</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span class="hs-special">)</span><span>
+</span><span id="line-166"></span><span id="trainTestSplit"><span class="annot"><span class="annottext">trainTestSplit :: [String]
+-&gt; [String]
+-&gt; Float
+-&gt; DataFrame Tensor
+-&gt; (Tensor, Tensor, Tensor, Tensor)
+</span><a href="Data.Frame.html#trainTestSplit"><span class="hs-identifier hs-var hs-var">trainTestSplit</span></a></span></span><span> </span><span id="local-6989586621679110286"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110286"><span class="hs-identifier hs-var">paramsX</span></a></span></span><span> </span><span id="local-6989586621679110285"><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110285"><span class="hs-identifier hs-var">paramsY</span></a></span></span><span> </span><span id="local-6989586621679110284"><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679110284"><span class="hs-identifier hs-var">trainSize</span></a></span></span><span> </span><span id="local-6989586621679110283"><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110283"><span class="hs-identifier hs-var">df</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110282"><span class="hs-identifier hs-var">trainX</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110281"><span class="hs-identifier hs-var">validX</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110280"><span class="hs-identifier hs-var">trainY</span></a></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110279"><span class="hs-identifier hs-var">validY</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-167"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-168"></span><span>    </span><span id="local-6989586621679110278"><span class="annot"><span class="annottext">trainLen :: Int
+</span><a href="#local-6989586621679110278"><span class="hs-identifier hs-var hs-var">trainLen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Int
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">round</span></span><span> </span><span class="annot"><span class="annottext">(Float -&gt; Int) -&gt; Float -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span>     </span><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679110284"><span class="hs-identifier hs-var">trainSize</span></a></span><span>     </span><span class="annot"><span class="annottext">Float -&gt; Float -&gt; Float
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Float
+forall a b. (Real a, Fractional b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">realToFrac</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Int
+</span><a href="Data.Frame.html#nRows"><span class="hs-identifier hs-var">nRows</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110283"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-169"></span><span>    </span><span id="local-6989586621679110275"><span class="annot"><span class="annottext">validLen :: Int
+</span><a href="#local-6989586621679110275"><span class="hs-identifier hs-var hs-var">validLen</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Int
+forall a b. (RealFrac a, Integral b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">round</span></span><span> </span><span class="annot"><span class="annottext">(Float -&gt; Int) -&gt; Float -&gt; Int
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Float
+</span><span class="hs-number">1.0</span></span><span> </span><span class="annot"><span class="annottext">Float -&gt; Float -&gt; Float
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-glyph hs-var">-</span></span><span> </span><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679110284"><span class="hs-identifier hs-var">trainSize</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Float -&gt; Float
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">*</span></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Float
+forall a b. (Real a, Fractional b) =&gt; a -&gt; b
+</span><span class="hs-identifier hs-var">realToFrac</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Int
+</span><a href="Data.Frame.html#nRows"><span class="hs-identifier hs-var">nRows</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110283"><span class="hs-identifier hs-var">df</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-170"></span><span>    </span><span id="local-6989586621679110274"><span class="annot"><span class="annottext">trainIdx :: Tensor
+</span><a href="#local-6989586621679110274"><span class="hs-identifier hs-var hs-var">trainIdx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int -&gt; TensorOptions -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.arange</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>               </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110278"><span class="hs-identifier hs-var">trainLen</span></a></span><span>       </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span>
+</span><span id="line-171"></span><span>             </span><span class="annot"><span class="annottext">(TensorOptions -&gt; Tensor) -&gt; TensorOptions -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">DType -&gt; TensorOptions -&gt; TensorOptions
+</span><span class="hs-identifier hs-var">T.withDType</span></span><span> </span><span class="annot"><span class="annottext">DType
+</span><span class="hs-identifier hs-var">T.Int64</span></span><span> </span><span class="annot"><span class="annottext">TensorOptions
+</span><span class="hs-identifier hs-var">T.defaultOpts</span></span><span>
+</span><span id="line-172"></span><span>    </span><span id="local-6989586621679110273"><span class="annot"><span class="annottext">validIdx :: Tensor
+</span><a href="#local-6989586621679110273"><span class="hs-identifier hs-var hs-var">validIdx</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int -&gt; TensorOptions -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.arange</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110278"><span class="hs-identifier hs-var">trainLen</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110278"><span class="hs-identifier hs-var">trainLen</span></a></span><span> </span><span class="annot"><span class="annottext">Int -&gt; Int -&gt; Int
+forall a. Num a =&gt; a -&gt; a -&gt; a
+</span><span class="hs-operator hs-var">+</span></span><span> </span><span class="annot"><span class="annottext">Int
+</span><a href="#local-6989586621679110275"><span class="hs-identifier hs-var">validLen</span></a></span><span class="hs-special">)</span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span> </span><span>
+</span><span id="line-173"></span><span>             </span><span class="annot"><span class="annottext">(TensorOptions -&gt; Tensor) -&gt; TensorOptions -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">DType -&gt; TensorOptions -&gt; TensorOptions
+</span><span class="hs-identifier hs-var">T.withDType</span></span><span> </span><span class="annot"><span class="annottext">DType
+</span><span class="hs-identifier hs-var">T.Int64</span></span><span> </span><span class="annot"><span class="annottext">TensorOptions
+</span><span class="hs-identifier hs-var">T.defaultOpts</span></span><span>
+</span><span id="line-174"></span><span>    </span><span id="local-6989586621679110282"><span class="annot"><span class="annottext">trainX :: Tensor
+</span><a href="#local-6989586621679110282"><span class="hs-identifier hs-var hs-var">trainX</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; DataFrame Tensor)
+-&gt; DataFrame Tensor
+-&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110274"><span class="hs-identifier hs-var">trainIdx</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#lookup"><span class="hs-identifier hs-var">lookup</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110286"><span class="hs-identifier hs-var">paramsX</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110283"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-175"></span><span>    </span><span id="local-6989586621679110281"><span class="annot"><span class="annottext">validX :: Tensor
+</span><a href="#local-6989586621679110281"><span class="hs-identifier hs-var hs-var">validX</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; DataFrame Tensor)
+-&gt; DataFrame Tensor
+-&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110273"><span class="hs-identifier hs-var">validIdx</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#lookup"><span class="hs-identifier hs-var">lookup</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110286"><span class="hs-identifier hs-var">paramsX</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110283"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-176"></span><span>    </span><span id="local-6989586621679110280"><span class="annot"><span class="annottext">trainY :: Tensor
+</span><a href="#local-6989586621679110280"><span class="hs-identifier hs-var hs-var">trainY</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; DataFrame Tensor)
+-&gt; DataFrame Tensor
+-&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110274"><span class="hs-identifier hs-var">trainIdx</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#lookup"><span class="hs-identifier hs-var">lookup</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110285"><span class="hs-identifier hs-var">paramsY</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110283"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-177"></span><span>    </span><span id="local-6989586621679110279"><span class="annot"><span class="annottext">validY :: Tensor
+</span><a href="#local-6989586621679110279"><span class="hs-identifier hs-var hs-var">validY</span></a></span></span><span>   </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor -&gt; Tensor
+forall a. DataFrame a -&gt; a
+</span><a href="Data.Frame.html#values"><span class="hs-identifier hs-var hs-var">values</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor)
+-&gt; (DataFrame Tensor -&gt; DataFrame Tensor)
+-&gt; DataFrame Tensor
+-&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#rowSelect"><span class="hs-identifier hs-var">rowSelect</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679110273"><span class="hs-identifier hs-var">validIdx</span></a></span><span> </span><span class="annot"><span class="annottext">(DataFrame Tensor -&gt; Tensor) -&gt; DataFrame Tensor -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">[String] -&gt; DataFrame Tensor -&gt; DataFrame Tensor
+</span><a href="Data.Frame.html#lookup"><span class="hs-identifier hs-var">lookup</span></a></span><span> </span><span class="annot"><span class="annottext">[String]
+</span><a href="#local-6989586621679110285"><span class="hs-identifier hs-var">paramsY</span></a></span><span> </span><span class="annot"><span class="annottext">DataFrame Tensor
+</span><a href="#local-6989586621679110283"><span class="hs-identifier hs-var">df</span></a></span><span>
+</span><span id="line-178"></span></pre></body></html>

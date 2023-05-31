@@ -1,7 +1,8 @@
 {-# OPTIONS_GHC -Wall #-}
 
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE StrictData #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -89,14 +90,22 @@ loadCheckPoint path spec iter = do
     pure (net, opt)
 
 -- | Trace and Return a Script Module
-traceModel :: Device -> PDK -> Int -> (T.Tensor -> T.Tensor) 
-           -> IO T.ScriptModule
-traceModel dev pdk num predict = do
-    T.randnIO' [10,num] >>= T.trace name "forward" fun . singleton
-                        >>= T.toScriptModule
+traceModel :: Device -> PDK -> Int -> [String] -> [String]
+           -> (T.Tensor -> T.Tensor) -> IO T.ScriptModule
+traceModel dev pdk num xs ys predict = do
+    !rm <- T.randnIO' [10,num] >>= T.trace name "forward" fun . singleton
+    T.define rm $ "def inputs(self,x):\n\treturn " ++ show xs ++ "\n"
+    T.define rm $ "def outputs(self,x):\n\treturn " ++ show ys ++ "\n"
+    T.toScriptModule rm
   where
-    fun   = pure . map predict -- mapM (T.detach . predict)
+    fun   = pure . map predict
     name  = show pdk ++ "_" ++ show dev
+
+-- | Trace to Function
+unTraceModel :: T.ScriptModule -> (T.Tensor -> T.Tensor)
+unTraceModel model' x = y
+  where
+    T.IVTensor y = T.runMethod1 model' "forward" $ T.IVTensor x
 
 -- | Save a Traced ScriptModule
 saveInferenceModel :: FilePath -> T.ScriptModule -> IO ()

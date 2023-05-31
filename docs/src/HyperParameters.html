@@ -1,0 +1,46 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wall #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-comment">-- | Hyper Parameters of OpNet</span><span>
+</span><span id="line-4"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">HyperParameters</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-5"></span><span>
+</span><span id="line-6"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Torch</span></span><span>            </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-7"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><a href="Torch.Extensions.html"><span class="hs-identifier">Torch.Extensions</span></a></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-8"></span><span>
+</span><span id="line-9"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-10"></span><span class="hs-comment">-- Adam</span><span>
+</span><span id="line-11"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-12"></span><span>
+</span><span id="line-13"></span><span class="hs-comment">-- | First gradient momentum estimate, default = 0.9</span><span>
+</span><span id="line-14"></span><span class="annot"><a href="HyperParameters.html#%3B21"><span class="hs-identifier hs-type">&#946;1</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span>
+</span><span id="line-15"></span><span id="%3B21"><span class="annot"><span class="annottext">&#946;1 :: Float
+</span><a href="HyperParameters.html#%3B21"><span class="hs-identifier hs-var hs-var">&#946;1</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float
+</span><span class="hs-number">0.9</span></span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- | second gradient momentum estimate, default = 0.999 </span><span>
+</span><span id="line-17"></span><span class="annot"><a href="HyperParameters.html#%3B22"><span class="hs-identifier hs-type">&#946;2</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span>
+</span><span id="line-18"></span><span id="%3B22"><span class="annot"><span class="annottext">&#946;2 :: Float
+</span><a href="HyperParameters.html#%3B22"><span class="hs-identifier hs-var hs-var">&#946;2</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float
+</span><span class="hs-number">0.999</span></span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- | Learning Rate</span><span>
+</span><span id="line-20"></span><span class="annot"><a href="HyperParameters.html#%3B1"><span class="hs-identifier hs-type">&#945;</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-21"></span><span id="%3B1"><span class="annot"><span class="annottext">&#945; :: Tensor
+</span><a href="HyperParameters.html#%3B1"><span class="hs-identifier hs-var hs-var">&#945;</span></a></span></span><span>  </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; TensorOptions -&gt; Tensor
+forall a. TensorLike a =&gt; a -&gt; TensorOptions -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.asTensor'</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Float
+</span><span class="hs-number">1.0e-3</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span class="hs-special">)</span><span> </span><span>
+</span><span id="line-22"></span><span>   </span><span class="annot"><span class="annottext">(TensorOptions -&gt; Tensor)
+-&gt; (TensorOptions -&gt; TensorOptions) -&gt; TensorOptions -&gt; Tensor
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">DType -&gt; TensorOptions -&gt; TensorOptions
+</span><span class="hs-identifier hs-var">T.withDType</span></span><span> </span><span class="annot"><span class="annottext">DType
+</span><span class="hs-identifier hs-var">T.Float</span></span><span> </span><span class="annot"><span class="annottext">(TensorOptions -&gt; TensorOptions)
+-&gt; (TensorOptions -&gt; TensorOptions)
+-&gt; TensorOptions
+-&gt; TensorOptions
+forall b c a. (b -&gt; c) -&gt; (a -&gt; b) -&gt; a -&gt; c
+</span><span class="hs-operator hs-var">.</span></span><span> </span><span class="annot"><span class="annottext">Device -&gt; TensorOptions -&gt; TensorOptions
+</span><span class="hs-identifier hs-var">T.withDevice</span></span><span> </span><span class="annot"><span class="annottext">Device
+</span><a href="Torch.Extensions.html#gpu"><span class="hs-identifier hs-var">T.gpu</span></a></span><span> </span><span class="annot"><span class="annottext">(TensorOptions -&gt; Tensor) -&gt; TensorOptions -&gt; Tensor
+forall a b. (a -&gt; b) -&gt; a -&gt; b
+</span><span class="hs-operator hs-var">$</span></span><span> </span><span class="annot"><span class="annottext">TensorOptions
+</span><span class="hs-identifier hs-var">T.defaultOpts</span></span><span>
+</span><span id="line-23"></span></pre></body></html>

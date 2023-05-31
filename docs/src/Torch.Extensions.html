@@ -1,0 +1,150 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><link rel="stylesheet" type="text/css" href="style.css" /><script type="text/javascript" src="highlight.js"></script></head><body><pre><span class="hs-pragma">{-# OPTIONS_GHC -Wall #-}</span><span>
+</span><span id="line-2"></span><span>
+</span><span id="line-3"></span><span class="hs-pragma">{-# LANGUAGE DeriveGeneric #-}</span><span>
+</span><span id="line-4"></span><span class="hs-pragma">{-# LANGUAGE DeriveAnyClass #-}</span><span>
+</span><span id="line-5"></span><span class="hs-pragma">{-# LANGUAGE RecordWildCards #-}</span><span>
+</span><span id="line-6"></span><span class="hs-pragma">{-# LANGUAGE MultiParamTypeClasses #-}</span><span>
+</span><span id="line-7"></span><span>
+</span><span id="line-8"></span><span class="hs-comment">-- | Hyper Parameters of OpNet</span><span>
+</span><span id="line-9"></span><span class="hs-keyword">module</span><span> </span><span class="hs-identifier">Torch.Extensions</span><span> </span><span class="hs-keyword">where</span><span>
+</span><span id="line-10"></span><span>
+</span><span id="line-11"></span><span class="hs-keyword">import</span><span>           </span><span class="annot"><span class="hs-identifier">GHC.Float</span></span><span>                       </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">float2Double</span></span><span class="hs-special">)</span><span>
+</span><span id="line-12"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Torch</span></span><span>                     </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span>
+</span><span id="line-13"></span><span class="hs-keyword">import</span><span> </span><span class="hs-keyword">qualified</span><span> </span><span class="annot"><span class="hs-identifier">Torch.Functional.Internal</span></span><span> </span><span class="hs-keyword">as</span><span> </span><span class="annot"><span class="hs-identifier">T</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="hs-identifier">nan_to_num</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">powScalar'</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">mse_loss</span></span><span class="hs-special">,</span><span> </span><span class="annot"><span class="hs-identifier">meanAll</span></span><span class="hs-special">)</span><span>
+</span><span id="line-14"></span><span>
+</span><span id="line-15"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-16"></span><span class="hs-comment">-- Convenience / Syntactic Sugar</span><span>
+</span><span id="line-17"></span><span class="hs-comment">------------------------------------------------------------------------------</span><span>
+</span><span id="line-18"></span><span>
+</span><span id="line-19"></span><span class="hs-comment">-- | GPU</span><span>
+</span><span id="line-20"></span><span class="annot"><a href="Torch.Extensions.html#gpu"><span class="hs-identifier hs-type">gpu</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Device</span></span><span>
+</span><span id="line-21"></span><span id="gpu"><span class="annot"><span class="annottext">gpu :: Device
+</span><a href="Torch.Extensions.html#gpu"><span class="hs-identifier hs-var hs-var">gpu</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DeviceType -&gt; Int16 -&gt; Device
+</span><span class="hs-identifier hs-var">T.Device</span></span><span> </span><span class="annot"><span class="annottext">DeviceType
+</span><span class="hs-identifier hs-var">T.CUDA</span></span><span> </span><span class="annot"><span class="annottext">Int16
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-22"></span><span>
+</span><span id="line-23"></span><span class="hs-comment">-- | CPU</span><span>
+</span><span id="line-24"></span><span class="annot"><a href="Torch.Extensions.html#cpu"><span class="hs-identifier hs-type">cpu</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Device</span></span><span>
+</span><span id="line-25"></span><span id="cpu"><span class="annot"><span class="annottext">cpu :: Device
+</span><a href="Torch.Extensions.html#cpu"><span class="hs-identifier hs-var hs-var">cpu</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">DeviceType -&gt; Int16 -&gt; Device
+</span><span class="hs-identifier hs-var">T.Device</span></span><span> </span><span class="annot"><span class="annottext">DeviceType
+</span><span class="hs-identifier hs-var">T.CPU</span></span><span> </span><span class="annot"><span class="annottext">Int16
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-26"></span><span>
+</span><span id="line-27"></span><span class="hs-comment">-- | The inverse of `log10`</span><span>
+</span><span id="line-28"></span><span class="annot"><a href="Torch.Extensions.html#pow10"><span class="hs-identifier hs-type">pow10</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-29"></span><span id="pow10"><span class="annot"><span class="annottext">pow10 :: Tensor -&gt; Tensor
+</span><a href="Torch.Extensions.html#pow10"><span class="hs-identifier hs-var hs-var">pow10</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Tensor -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.powScalar'</span></span><span> </span><span class="annot"><span class="annottext">Float
+</span><span class="hs-number">10.0</span></span><span>
+</span><span id="line-30"></span><span>
+</span><span id="line-31"></span><span class="hs-comment">-- | Because snake_case sucks and this project uses Float instead of Double</span><span>
+</span><span id="line-32"></span><span class="annot"><a href="Torch.Extensions.html#nanToNum"><span class="hs-identifier hs-type">nanToNum</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-33"></span><span id="nanToNum"><span class="annot"><span class="annottext">nanToNum :: Float -&gt; Float -&gt; Float -&gt; Tensor -&gt; Tensor
+</span><a href="Torch.Extensions.html#nanToNum"><span class="hs-identifier hs-var hs-var">nanToNum</span></a></span></span><span> </span><span id="local-6989586621679109770"><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679109770"><span class="hs-identifier hs-var">nan'</span></a></span></span><span> </span><span id="local-6989586621679109769"><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679109769"><span class="hs-identifier hs-var">posinf'</span></a></span></span><span> </span><span id="local-6989586621679109768"><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679109768"><span class="hs-identifier hs-var">neginf'</span></a></span></span><span> </span><span id="local-6989586621679109767"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109767"><span class="hs-identifier hs-var">self</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Double -&gt; Double -&gt; Double -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.nan_to_num</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109767"><span class="hs-identifier hs-var">self</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109766"><span class="hs-identifier hs-var">nan</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109765"><span class="hs-identifier hs-var">posinf</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109764"><span class="hs-identifier hs-var">neginf</span></a></span><span>
+</span><span id="line-34"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-35"></span><span>    </span><span id="local-6989586621679109766"><span class="annot"><span class="annottext">nan :: Double
+</span><a href="#local-6989586621679109766"><span class="hs-identifier hs-var hs-var">nan</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Double
+</span><span class="hs-identifier hs-var">float2Double</span></span><span> </span><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679109770"><span class="hs-identifier hs-var">nan'</span></a></span><span>
+</span><span id="line-36"></span><span>    </span><span id="local-6989586621679109765"><span class="annot"><span class="annottext">posinf :: Double
+</span><a href="#local-6989586621679109765"><span class="hs-identifier hs-var hs-var">posinf</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Double
+</span><span class="hs-identifier hs-var">float2Double</span></span><span> </span><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679109769"><span class="hs-identifier hs-var">posinf'</span></a></span><span>
+</span><span id="line-37"></span><span>    </span><span id="local-6989586621679109764"><span class="annot"><span class="annottext">neginf :: Double
+</span><a href="#local-6989586621679109764"><span class="hs-identifier hs-var hs-var">neginf</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Double
+</span><span class="hs-identifier hs-var">float2Double</span></span><span> </span><span class="annot"><span class="annottext">Float
+</span><a href="#local-6989586621679109768"><span class="hs-identifier hs-var">neginf'</span></a></span><span>
+</span><span id="line-38"></span><span>
+</span><span id="line-39"></span><span class="hs-comment">-- | Default limits for `nanToNum`</span><span>
+</span><span id="line-40"></span><span class="annot"><a href="Torch.Extensions.html#nanToNum%27"><span class="hs-identifier hs-type">nanToNum'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-41"></span><span id="nanToNum%27"><span class="annot"><span class="annottext">nanToNum' :: Tensor -&gt; Tensor
+</span><a href="Torch.Extensions.html#nanToNum%27"><span class="hs-identifier hs-var hs-var">nanToNum'</span></a></span></span><span> </span><span id="local-6989586621679109762"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109762"><span class="hs-identifier hs-var">self</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Double -&gt; Double -&gt; Double -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.nan_to_num</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109762"><span class="hs-identifier hs-var">self</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109761"><span class="hs-identifier hs-var">nan</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109760"><span class="hs-identifier hs-var">posinf</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109759"><span class="hs-identifier hs-var">neginf</span></a></span><span>
+</span><span id="line-42"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-43"></span><span>    </span><span id="local-6989586621679109761"><span class="annot"><span class="annottext">nan :: Double
+</span><a href="#local-6989586621679109761"><span class="hs-identifier hs-var hs-var">nan</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">0.0</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Double</span></span><span>
+</span><span id="line-44"></span><span>    </span><span id="local-6989586621679109760"><span class="annot"><span class="annottext">posinf :: Double
+</span><a href="#local-6989586621679109760"><span class="hs-identifier hs-var hs-var">posinf</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Double
+</span><span class="hs-identifier hs-var">float2Double</span></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Float
+</span><span class="hs-number">2.0e32</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span class="hs-special">)</span><span>
+</span><span id="line-45"></span><span>    </span><span id="local-6989586621679109759"><span class="annot"><span class="annottext">neginf :: Double
+</span><a href="#local-6989586621679109759"><span class="hs-identifier hs-var hs-var">neginf</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Float -&gt; Double
+</span><span class="hs-identifier hs-var">float2Double</span></span><span> </span><span class="hs-special">(</span><span class="hs-glyph">-</span><span class="annot"><span class="annottext">Float
+</span><span class="hs-number">2.0e32</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Float</span></span><span class="hs-special">)</span><span>
+</span><span id="line-46"></span><span>
+</span><span id="line-47"></span><span class="hs-comment">-- | Default limits for `nanToNum` (0.0)</span><span>
+</span><span id="line-48"></span><span class="annot"><a href="Torch.Extensions.html#nanToNum%27%27"><span class="hs-identifier hs-type">nanToNum''</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-49"></span><span id="nanToNum%27%27"><span class="annot"><span class="annottext">nanToNum'' :: Tensor -&gt; Tensor
+</span><a href="Torch.Extensions.html#nanToNum%27%27"><span class="hs-identifier hs-var hs-var">nanToNum''</span></a></span></span><span> </span><span id="local-6989586621679109757"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109757"><span class="hs-identifier hs-var">self</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Double -&gt; Double -&gt; Double -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.nan_to_num</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109757"><span class="hs-identifier hs-var">self</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109756"><span class="hs-identifier hs-var">nan</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109755"><span class="hs-identifier hs-var">posinf</span></a></span><span> </span><span class="annot"><span class="annottext">Double
+</span><a href="#local-6989586621679109754"><span class="hs-identifier hs-var">neginf</span></a></span><span>
+</span><span id="line-50"></span><span>  </span><span class="hs-keyword">where</span><span>
+</span><span id="line-51"></span><span>    </span><span id="local-6989586621679109756"><span class="annot"><span class="annottext">nan :: Double
+</span><a href="#local-6989586621679109756"><span class="hs-identifier hs-var hs-var">nan</span></a></span></span><span>    </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">0.0</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Double</span></span><span>
+</span><span id="line-52"></span><span>    </span><span id="local-6989586621679109755"><span class="annot"><span class="annottext">posinf :: Double
+</span><a href="#local-6989586621679109755"><span class="hs-identifier hs-var hs-var">posinf</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">0.0</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Double</span></span><span>
+</span><span id="line-53"></span><span>    </span><span id="local-6989586621679109754"><span class="annot"><span class="annottext">neginf :: Double
+</span><a href="#local-6989586621679109754"><span class="hs-identifier hs-var hs-var">neginf</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Double
+</span><span class="hs-number">0.0</span></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">Double</span></span><span>
+</span><span id="line-54"></span><span>
+</span><span id="line-55"></span><span class="hs-comment">-- | MSE with reduction</span><span>
+</span><span id="line-56"></span><span class="annot"><a href="Torch.Extensions.html#mseLoss%27"><span class="hs-identifier hs-type">mseLoss'</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Reduction</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-57"></span><span id="mseLoss%27"><span class="annot"><span class="annottext">mseLoss' :: Reduction -&gt; Tensor -&gt; Tensor -&gt; Tensor
+</span><a href="Torch.Extensions.html#mseLoss%27"><span class="hs-identifier hs-var hs-var">mseLoss'</span></a></span></span><span> </span><span class="annot"><span class="annottext">Reduction
+</span><span class="hs-identifier hs-var">T.ReduceNone</span></span><span> </span><span id="local-6989586621679109751"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109751"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679109750"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109750"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor -&gt; Int -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.mse_loss</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109751"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109750"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">0</span></span><span>
+</span><span id="line-58"></span><span class="annot"><a href="Torch.Extensions.html#mseLoss%27"><span class="hs-identifier hs-var">mseLoss'</span></a></span><span> </span><span class="annot"><span class="annottext">Reduction
+</span><span class="hs-identifier hs-var">T.ReduceMean</span></span><span> </span><span id="local-6989586621679109748"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109748"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679109747"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109747"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor -&gt; Int -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.mse_loss</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109748"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109747"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">1</span></span><span>
+</span><span id="line-59"></span><span class="annot"><a href="Torch.Extensions.html#mseLoss%27"><span class="hs-identifier hs-var">mseLoss'</span></a></span><span> </span><span class="annot"><span class="annottext">Reduction
+</span><span class="hs-identifier hs-var">T.ReduceSum</span></span><span>  </span><span id="local-6989586621679109745"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109745"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span id="local-6989586621679109744"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109744"><span class="hs-identifier hs-var">y</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; Tensor -&gt; Int -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.mse_loss</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109745"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109744"><span class="hs-identifier hs-var">y</span></a></span><span> </span><span class="annot"><span class="annottext">Int
+</span><span class="hs-number">2</span></span><span>
+</span><span id="line-60"></span><span>
+</span><span id="line-61"></span><span class="hs-comment">-- | Mean over all dimensions</span><span>
+</span><span id="line-62"></span><span class="annot"><a href="Torch.Extensions.html#meanAll"><span class="hs-identifier hs-type">meanAll</span></a></span><span> </span><span class="hs-glyph">::</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span> </span><span class="hs-glyph">-&gt;</span><span> </span><span class="annot"><span class="hs-identifier hs-type">T.Tensor</span></span><span>
+</span><span id="line-63"></span><span id="meanAll"><span class="annot"><span class="annottext">meanAll :: Tensor -&gt; Tensor
+</span><a href="Torch.Extensions.html#meanAll"><span class="hs-identifier hs-var hs-var">meanAll</span></a></span></span><span> </span><span id="local-6989586621679109742"><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109742"><span class="hs-identifier hs-var">x</span></a></span></span><span> </span><span class="hs-glyph">=</span><span> </span><span class="annot"><span class="annottext">Tensor -&gt; DType -&gt; Tensor
+</span><span class="hs-identifier hs-var">T.meanAll</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109742"><span class="hs-identifier hs-var">x</span></a></span><span> </span><span class="hs-special">(</span><span class="annot"><span class="annottext">Tensor -&gt; DType
+</span><span class="hs-identifier hs-var">T.dtype</span></span><span> </span><span class="annot"><span class="annottext">Tensor
+</span><a href="#local-6989586621679109742"><span class="hs-identifier hs-var">x</span></a></span><span class="hs-special">)</span><span>
+</span><span id="line-64"></span></pre></body></html>

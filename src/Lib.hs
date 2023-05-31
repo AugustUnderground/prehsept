@@ -18,7 +18,7 @@ import           System.Directory
 import           System.ProgressBar
 import qualified Torch                     as T
 import qualified Torch.Extensions          as T
-import qualified Torch.Functional.Internal as T (where')
+-- import qualified Torch.Functional.Internal as T (where')
 
 ------------------------------------------------------------------------------
 -- Data Types
@@ -134,11 +134,22 @@ scale' xMin xMax x = (x * (xMax - xMin)) + xMin
 
 -- | Apply log10 to masked data
 trafo :: T.Tensor -> T.Tensor -> T.Tensor
-trafo xMask x = T.where' xMask (T.log10 $ T.abs x) x
+trafo b x = y + y'
+  where
+    m  = T.toDType T.Float . T.logicalAnd b . T.lt 0.0 $ T.abs x 
+    m' = 1.0 - m
+    o  = T.mul m' $ T.onesLike x
+    y  = T.log10 . T.abs . T.add o $ x * m
+    y' = x * m'
 
 -- | Apply pow10 to masked data
 trafo' :: T.Tensor -> T.Tensor -> T.Tensor
-trafo' xMask x = T.where' xMask (T.pow10 x) x
+trafo' b x = y + y'
+  where
+    m  = T.toDType T.Float b
+    m' = T.toDType T.Float $ T.logicalNot b
+    y  = T.mul m . T.pow10 $ x * m
+    y' = x * m'
 
 -- | calculate gm from gm/Id and Id, input is [gm/Id, Id, fug, Vds, Vbs]
 process :: T.Tensor -> T.Tensor
@@ -153,7 +164,7 @@ process x = T.cat (T.Dim 1) [ gm, x ]
 -- | Default Column Names for stored Tensors
 columnHeader :: [String]
 columnHeader = [ "W", "L", "M", "temp", "region"
-               , "vgs", "vds", "vbs", "vth", "vdsat", "vearly"
+               , "vds", "vgs", "vbs", "vth", "vdsat", "vearly"
                , "gm", "gds", "gmbs", "self_gain", "ron", "rout"
                , "id", "gmoverid", "fug", "betaeff", "pwr"
                , "cgg", "cgd", "cgs", "cgb"
@@ -214,6 +225,7 @@ data Args = Args { pdk  :: !PDK      -- ^ PDK
                  , num  :: !Int      -- ^ Number of Epochs
                  , reg  :: !Int      -- ^ Area of Operation
                  , size :: !Int      -- ^ Batch Size
+                 , exp  :: !Bool     -- ^ Experimental
                  } deriving (Show)
 
 ------------------------------------------------------------------------------

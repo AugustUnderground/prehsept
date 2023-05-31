@@ -51,3 +51,6 @@ args = Args <$> option auto ( long "pdk"
                            <> showDefault 
                            <> value 5000
                            <> help "Batch Size" )
+            <*> switch ( long "exp" 
+                      <> short 'e'
+                      <> help "Experimental Mapping" )
