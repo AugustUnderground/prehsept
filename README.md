@@ -49,6 +49,7 @@ Available options:
   -p,--dir DIR             Path to lookup-table as tensor
   -n,--num NUM             Number of Epochs (default: 25)
   -r,--reg REGION          Region of Operation: 2 | 3 (default: 2)
+  -e,--exp                 Experimental Mapping
   -s,--size SIZE           Batch Size (default: 5000)
   -h,--help                Show this help text
 ```
