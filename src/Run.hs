@@ -182,9 +182,9 @@ runExp Args{..} = do
                                               , "cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"
                                               ] paramsY
     neg m t    = T.add (T.negative (T.mul m t)) (T.mul (1.0 - m) t)
-    !maskNeg'   = if dev == NMOS then ["cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
-                                 else ["id","cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
-    !maskNeg    = T.toDType T.Float . T.toDevice T.cpu $ boolMask' maskNeg' paramsY
+    !maskNeg'  = if dev == NMOS then ["cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
+                                else ["id","cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
+    !maskNeg   = T.toDType T.Float . T.toDevice T.cpu $ boolMask' maskNeg' paramsY
     numInputs  = length paramsX
     numOutputs = length paramsY
 
