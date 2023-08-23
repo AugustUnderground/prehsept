@@ -113,9 +113,12 @@ runExp Args{..} = do
 
     df' <- DF.fromFile dir
 
-    let cls'   = ["id", "gm", "gds", "gmbs", "cgs", "cgd", "cgb", "csd", "cbs", "cbd"]
-        cls''  = ["idoverW", "gmoverW", "gdsoverW", "gmbsoverW", "cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
-        dfNorm = DF.DataFrame cls'' $ T.div (DF.values $ DF.lookup cls' df') (df' ?? "W")
+    let cls''  = [ "idoverW", "gmoverW", "gdsoverW", "gmbsoverW"
+                 , "cgsoverW", "cgdoverW", "cgboverW"
+                 , "csdoverW", "cbsoverW", "cbdoverW"]
+        cls' = map (reverse . drop 5 . reverse) cls''
+        dfNorm = DF.DataFrame cls''
+               $ T.div (DF.values $ DF.lookup cls' df') (df' ?? "W")
         dfRaw  = DF.union df' dfNorm
 
     modelPath <- createModelDir pdk' dev'
@@ -172,18 +175,19 @@ runExp Args{..} = do
     dev'       = show dev
     testSplit  = 0.75
     paramsX    = ["L", "vds", "vgs", "vbs"]
-    paramsY    = [ "fug", "gmoverid"
+    paramsY    = [ "fug", "gmoverid", "self_gain"
                  , "idoverW", "gmoverW", "gdsoverW", "gmbsoverW"
                  , "vdsat", "vth"
                  , "cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW" ]
     cols       = paramsX ++ paramsY ++ ["region"]
     maskX      = T.toDevice T.cpu $ boolMask' ["L"] paramsX
-    maskY      = T.toDevice T.cpu $ boolMask' [ "idoverW", "fug", "gmoverW", "gdsoverW", "gmbsoverW"
-                                              , "cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"
+    maskY      = T.toDevice T.cpu $ boolMask' [ "fug", "self_gain", "idoverW", "gmoverW", "gdsoverW", "gmbsoverW"
+                                              , "cgsoverW", "cgdoverW", "cgboverW"
+                                              , "csdoverW", "cbsoverW", "cbdoverW"
                                               ] paramsY
     neg m t    = T.add (T.negative (T.mul m t)) (T.mul (1.0 - m) t)
     !maskNeg'  = if dev == NMOS then ["cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
-                                else ["id","cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
+                                else ["idoverW", "cgsoverW", "cgdoverW", "cgboverW", "csdoverW", "cbsoverW", "cbdoverW"]
     !maskNeg   = T.toDType T.Float . T.toDevice T.cpu $ boolMask' maskNeg' paramsY
     numInputs  = length paramsX
     numOutputs = length paramsY
